@@ -205,3 +205,27 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ML/AI Security Specific
+models/
+checkpoints/
+wandb/
+outputs/
+data/raw/
+*.pkl
+*.h5
+*.hdf5
+*.model
+*.weights
+
+# RLHF Audit Trail Specific
+audit_logs/
+compliance_reports/
+*.audit
+.secrets/
+*.pem
+*.key
+secrets.yaml
+.env.local
+.env.production
+privacy_reports/
