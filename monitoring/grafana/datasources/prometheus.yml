@@ -1,0 +1,71 @@
+# Grafana datasource configuration for Prometheus
+apiVersion: 1
+
+datasources:
+  # Primary Prometheus datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    
+    # Basic settings
+    basicAuth: false
+    withCredentials: false
+    
+    # Prometheus-specific settings
+    jsonData:
+      # HTTP method for queries
+      httpMethod: POST
+      
+      # Query timeout
+      queryTimeout: '60s'
+      
+      # Time interval options
+      timeInterval: '15s'
+      
+      # Custom headers (if needed)
+      # customQueryParameters: 'timeout=60s'
+      
+      # Exemplars support
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: jaeger
+          
+    # Additional configuration
+    editable: true
+    orgId: 1
+    version: 1
+
+  # Long-term storage Prometheus (if using remote storage)
+  - name: Prometheus-LTS
+    type: prometheus
+    access: proxy
+    url: http://prometheus-lts:9090
+    
+    # Optimized for historical data
+    jsonData:
+      httpMethod: POST
+      queryTimeout: '300s'
+      timeInterval: '1m'
+      
+    editable: true
+    orgId: 1
+    version: 1
+
+  # Compliance-specific Prometheus instance (if separated)
+  - name: Compliance-Metrics
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    
+    # Filter to compliance metrics only
+    jsonData:
+      httpMethod: POST
+      queryTimeout: '60s'
+      # Custom query parameters for compliance filtering
+      customQueryParameters: 'match[]={compliance_check="true"}'
+      
+    editable: true
+    orgId: 1
+    version: 1

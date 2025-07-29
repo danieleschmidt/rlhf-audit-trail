@@ -1,0 +1,296 @@
+# Alertmanager configuration for RLHF Audit Trail
+# Handles alert routing, grouping, and notifications for compliance and operational issues
+
+global:
+  # SMTP configuration for email notifications
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@rlhf-audit-trail.com'
+  smtp_auth_username: 'alerts@rlhf-audit-trail.com'
+  smtp_auth_password: 'app_password_here'
+  smtp_require_tls: true
+
+# Route configuration
+route:
+  # Root route - all alerts start here
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  
+  # Sub-routes for specific alert types
+  routes:
+    # Critical compliance violations - immediate notification
+    - match:
+        severity: critical
+        category: compliance
+      receiver: 'compliance-critical'
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: true
+    
+    # Security alerts - immediate notification
+    - match:
+        severity: critical
+        category: security
+      receiver: 'security-critical'
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: true
+    
+    # Privacy budget violations - immediate notification
+    - match:
+        alertname: PrivacyBudgetExceeded
+      receiver: 'privacy-team'
+      group_wait: 0s
+      repeat_interval: 30m
+    
+    # Audit trail integrity failures - immediate notification
+    - match:
+        alertname: AuditTrailIntegrityFailure
+      receiver: 'audit-team'
+      group_wait: 0s
+      repeat_interval: 15m
+    
+    # High severity operational alerts
+    - match:
+        severity: high
+      receiver: 'ops-team'
+      group_wait: 1m
+      repeat_interval: 4h
+    
+    # Warning level alerts
+    - match:
+        severity: warning
+      receiver: 'ops-team'
+      group_wait: 5m
+      repeat_interval: 12h
+    
+    # Development environment alerts (lower priority)
+    - match:
+        environment: development
+      receiver: 'dev-team'
+      group_wait: 10m
+      repeat_interval: 24h
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # If application is down, don't alert on individual component failures
+  - source_match:
+      alertname: ApplicationDown
+    target_match:
+      service: rlhf-audit-trail
+    equal: ['instance']
+  
+  # If database is down, don't alert on connection errors
+  - source_match:
+      alertname: DatabaseDown
+    target_match_re:
+      alertname: .*ConnectionError
+    equal: ['instance']
+  
+  # If compliance is in maintenance mode, suppress compliance alerts
+  - source_match:
+      alertname: ComplianceMaintenanceMode
+    target_match:
+      category: compliance
+    equal: ['instance']
+
+# Receiver configurations
+receivers:
+  # Default receiver for unmatched alerts
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops-team@company.com'
+        subject: '[RLHF Audit Trail] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+        headers:
+          X-Priority: 'Normal'
+
+  # Critical compliance violations
+  - name: 'compliance-critical'
+    email_configs:
+      - to: 'compliance-team@company.com'
+        cc: 'legal-team@company.com,executive-team@company.com'
+        subject: '🚨 CRITICAL COMPLIANCE VIOLATION - {{ .GroupLabels.alertname }}'
+        body: |
+          CRITICAL COMPLIANCE VIOLATION DETECTED
+          =====================================
+          
+          This is an automated alert for a critical compliance violation that requires immediate attention.
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Compliance Framework: {{ .Labels.framework }}
+          Violation Type: {{ .Labels.violation_type }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          
+          Remediation Required:
+          {{ .Annotations.remediation }}
+          
+          Documentation: {{ .Annotations.documentation_url }}
+          {{ end }}
+          
+          Please review and address this violation immediately to maintain compliance status.
+        headers:
+          X-Priority: 'High'
+    
+    # Slack notification for compliance team
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#compliance-alerts'
+        color: 'danger'
+        title: '🚨 Critical Compliance Violation'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Framework:* {{ .Labels.framework }}
+          *Violation:* {{ .Labels.violation_type }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        send_resolved: true
+
+  # Critical security alerts
+  - name: 'security-critical'
+    email_configs:
+      - to: 'security-team@company.com'
+        cc: 'ops-team@company.com'
+        subject: '🔒 CRITICAL SECURITY ALERT - {{ .GroupLabels.alertname }}'
+        body: |
+          CRITICAL SECURITY ALERT
+          ======================
+          
+          {{ range .Alerts }}
+          Security Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Attack Vector: {{ .Labels.attack_vector }}
+          Affected Component: {{ .Labels.component }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          
+          Immediate Actions Required:
+          {{ .Annotations.immediate_actions }}
+          {{ end }}
+        headers:
+          X-Priority: 'High'
+    
+    # PagerDuty integration for security incidents
+    pagerduty_configs:
+      - routing_key: 'YOUR_PAGERDUTY_INTEGRATION_KEY'
+        severity: 'critical'
+        description: '{{ .GroupLabels.alertname }}: {{ .Annotations.summary }}'
+
+  # Privacy team notifications
+  - name: 'privacy-team'
+    email_configs:
+      - to: 'privacy-team@company.com'
+        cc: 'compliance-team@company.com'
+        subject: '🔐 Privacy Budget Alert - {{ .GroupLabels.alertname }}'
+        body: |
+          PRIVACY BUDGET ALERT
+          ===================
+          
+          {{ range .Alerts }}
+          Privacy Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Current Budget: {{ .Labels.current_budget }}
+          Budget Limit: {{ .Labels.budget_limit }}
+          Utilization: {{ .Labels.utilization_percent }}%
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+          
+          Please review differential privacy parameters and adjust if necessary.
+        headers:
+          X-Priority: 'High'
+
+  # Audit team notifications
+  - name: 'audit-team'
+    email_configs:
+      - to: 'audit-team@company.com'
+        cc: 'compliance-team@company.com'
+        subject: '📋 Audit Trail Alert - {{ .GroupLabels.alertname }}'
+        body: |
+          AUDIT TRAIL INTEGRITY ALERT
+          ===========================
+          
+          {{ range .Alerts }}
+          Audit Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Integrity Check: {{ .Labels.integrity_check }}
+          Hash Verification: {{ .Labels.hash_verification }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+          
+          Audit trail integrity may be compromised. Immediate investigation required.
+        headers:
+          X-Priority: 'High'
+
+  # Operations team notifications
+  - name: 'ops-team'
+    email_configs:
+      - to: 'ops-team@company.com'
+        subject: '[RLHF Ops] {{ .GroupLabels.alertname }}'
+        body: |
+          OPERATIONAL ALERT
+          ================
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          Time: {{ .StartsAt }}
+          
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+        headers:
+          X-Priority: 'Normal'
+    
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#ops-alerts'
+        color: 'warning'
+        title: 'RLHF Operational Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        send_resolved: true
+
+  # Development team notifications (lower priority)
+  - name: 'dev-team'
+    email_configs:
+      - to: 'dev-team@company.com'
+        subject: '[RLHF Dev] {{ .GroupLabels.alertname }}'
+        body: |
+          DEVELOPMENT ENVIRONMENT ALERT
+          =============================
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Environment: {{ .Labels.environment }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+        headers:
+          X-Priority: 'Low'
+
+# Templates for alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

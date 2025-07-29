@@ -1,0 +1,291 @@
+# Prometheus alerting rules for RLHF Audit Trail
+# These rules define when alerts should be triggered for compliance and operational issues
+
+groups:
+  # Compliance-related alerts
+  - name: compliance_alerts
+    rules:
+      # Critical compliance violation
+      - alert: CriticalComplianceViolation
+        expr: compliance_violations_critical_total > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: compliance
+          framework: eu_ai_act
+        annotations:
+          summary: "Critical compliance violation detected"
+          description: "{{ $value }} critical compliance violations have been detected. Immediate attention required."
+          remediation: "Review compliance report and address critical violations immediately"
+          documentation_url: "https://docs.rlhf-audit-trail.com/compliance"
+
+      # Compliance score below threshold
+      - alert: ComplianceScoreLow
+        expr: compliance_score_percentage < 85
+        for: 5m
+        labels:
+          severity: high
+          category: compliance
+        annotations:
+          summary: "Compliance score below threshold"
+          description: "Current compliance score is {{ $value }}%, below the required 85% threshold."
+          remediation: "Review failed compliance checks and implement necessary fixes"
+
+      # High number of compliance warnings
+      - alert: ComplianceWarningsHigh
+        expr: compliance_violations_warning_total > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: compliance
+        annotations:
+          summary: "High number of compliance warnings"
+          description: "{{ $value }} compliance warnings detected. Consider addressing to prevent future violations."
+
+  # Privacy and data protection alerts
+  - name: privacy_alerts
+    rules:
+      # Privacy budget exceeded
+      - alert: PrivacyBudgetExceeded
+        expr: privacy_epsilon_used / privacy_epsilon_total > 0.9
+        for: 1m
+        labels:
+          severity: critical
+          category: privacy
+        annotations:
+          summary: "Privacy budget nearly exceeded"
+          description: "Privacy budget utilization is at {{ $value | humanizePercentage }}. Risk of privacy breach."
+          remediation: "Stop data processing or increase privacy budget allocation"
+
+      # Differential privacy noise too low
+      - alert: DifferentialPrivacyNoiseLow
+        expr: privacy_noise_multiplier < 1.0
+        for: 5m
+        labels:
+          severity: high
+          category: privacy
+        annotations:
+          summary: "Differential privacy noise too low"
+          description: "Current noise multiplier is {{ $value }}, which may not provide adequate privacy protection."
+
+      # Personal data retention violation
+      - alert: DataRetentionViolation
+        expr: data_retention_days_exceeded > 0
+        for: 0m
+        labels:
+          severity: high
+          category: privacy
+          framework: gdpr
+        annotations:
+          summary: "Data retention policy violation"
+          description: "{{ $value }} records have exceeded the data retention policy limit."
+          remediation: "Review and purge old data according to retention policy"
+
+  # Audit trail integrity alerts
+  - name: audit_trail_alerts
+    rules:
+      # Audit trail integrity failure
+      - alert: AuditTrailIntegrityFailure
+        expr: audit_log_integrity_check_passed == 0
+        for: 0m
+        labels:
+          severity: critical
+          category: audit
+        annotations:
+          summary: "Audit trail integrity check failed"
+          description: "Cryptographic integrity verification of audit logs has failed."
+          remediation: "Investigate potential tampering and restore from backup if necessary"
+          immediate_actions: "1. Stop all operations 2. Preserve evidence 3. Contact security team"
+
+      # Merkle tree validation failure
+      - alert: MerkleTreeValidationFailure
+        expr: merkle_tree_validation_failed_total > 0
+        for: 0m
+        labels:
+          severity: high
+          category: audit
+        annotations:
+          summary: "Merkle tree validation failure"
+          description: "{{ $value }} Merkle tree validations have failed in the last hour."
+
+      # Audit log storage issues
+      - alert: AuditLogStorageIssue
+        expr: increase(audit_log_write_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: high
+          category: audit
+        annotations:
+          summary: "Audit log storage errors"
+          description: "{{ $value }} audit log write errors in the last 5 minutes."
+
+  # Application health alerts
+  - name: application_health
+    rules:
+      # Application down
+      - alert: ApplicationDown
+        expr: up{job="rlhf-audit-trail-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: operational
+        annotations:
+          summary: "RLHF Audit Trail application is down"
+          description: "The main application has been down for more than 1 minute."
+          runbook_url: "https://runbooks.rlhf-audit-trail.com/application-down"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="rlhf-audit-trail-app"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s, above 2s threshold."
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{job="rlhf-audit-trail-app",status=~"5.."}[5m]) / rate(http_requests_total{job="rlhf-audit-trail-app"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: high
+          category: operational
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+  # RLHF-specific alerts
+  - name: rlhf_specific_alerts
+    rules:
+      # Training session stalled
+      - alert: RLHFTrainingStalled
+        expr: changes(rlhf_training_epoch_current[30m]) == 0 and rlhf_training_sessions_active > 0
+        for: 30m
+        labels:
+          severity: high
+          category: rlhf
+        annotations:
+          summary: "RLHF training session appears stalled"
+          description: "No progress in training epochs for 30 minutes while sessions are active."
+
+      # Annotation rate too low
+      - alert: LowAnnotationRate
+        expr: rate(rlhf_annotations_total[1h]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          category: rlhf
+        annotations:
+          summary: "Low annotation rate detected"
+          description: "Annotation rate is {{ $value }} per hour, below expected threshold of 10."
+
+      # Human oversight failure
+      - alert: HumanOversightFailure
+        expr: human_oversight_interventions_failed_total > 0
+        for: 0m
+        labels:
+          severity: high
+          category: rlhf
+          framework: eu_ai_act
+        annotations:
+          summary: "Human oversight system failure"
+          description: "{{ $value }} human oversight interventions have failed."
+
+  # Infrastructure alerts
+  - name: infrastructure_alerts
+    rules:
+      # Database down
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Database has been unreachable for more than 1 minute."
+
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: high
+          category: infrastructure
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been unreachable for more than 1 minute."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{name="rlhf-audit-trail-app"} / container_spec_memory_limit_bytes{name="rlhf-audit-trail-app"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} of the limit."
+
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name="rlhf-audit-trail-app"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: high
+          category: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space is {{ $value | humanizePercentage }} of total."
+
+  # Security alerts
+  - name: security_alerts
+    rules:
+      # Suspicious authentication patterns
+      - alert: SuspiciousAuthenticationPattern
+        expr: increase(authentication_failures_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: high
+          category: security
+          attack_vector: authentication
+        annotations:
+          summary: "Suspicious authentication pattern detected"
+          description: "{{ $value }} authentication failures in the last 5 minutes."
+          immediate_actions: "1. Block suspicious IPs 2. Review access logs 3. Alert security team"
+
+      # Potential data exfiltration
+      - alert: PotentialDataExfiltration
+        expr: rate(data_export_bytes_total[5m]) > 100000000  # 100MB/5min
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+          attack_vector: data_exfiltration
+        annotations:
+          summary: "Potential data exfiltration detected"
+          description: "Large amount of data export: {{ $value | humanizeBytes }} in 5 minutes."
+
+      # Unauthorized access attempt
+      - alert: UnauthorizedAccessAttempt
+        expr: increase(unauthorized_access_attempts_total[1m]) > 5
+        for: 0m
+        labels:
+          severity: high
+          category: security
+        annotations:
+          summary: "Unauthorized access attempts detected"
+          description: "{{ $value }} unauthorized access attempts in the last minute."

@@ -1,0 +1,84 @@
+# Development dependencies for RLHF Audit Trail
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=7.4.0,<8.0.0
+pytest-cov>=4.1.0,<5.0.0
+pytest-asyncio>=0.21.0,<1.0.0
+pytest-mock>=3.11.0,<4.0.0
+pytest-xdist>=3.3.0,<4.0.0  # Parallel test execution
+pytest-benchmark>=4.0.0,<5.0.0
+pytest-timeout>=2.1.0,<3.0.0
+hypothesis>=6.82.0,<7.0.0  # Property-based testing
+faker>=19.3.0,<20.0.0  # Fake data generation
+
+# Code Quality
+black>=23.7.0,<24.0.0
+ruff>=0.0.280,<1.0.0
+isort>=5.12.0,<6.0.0
+mypy>=1.5.0,<2.0.0
+pre-commit>=3.3.0,<4.0.0
+
+# Security
+bandit[toml]>=1.7.5,<2.0.0
+safety>=3.0.0,<4.0.0
+detect-secrets>=1.4.0,<2.0.0
+pip-audit>=2.6.0,<3.0.0
+
+# Documentation
+sphinx>=7.1.0,<8.0.0
+sphinx-rtd-theme>=1.3.0,<2.0.0
+sphinx-autodoc-typehints>=1.24.0,<2.0.0
+myst-parser>=2.0.0,<3.0.0
+sphinx-copybutton>=0.5.0,<1.0.0
+
+# Type stubs
+types-requests>=2.31.0,<3.0.0
+types-redis>=4.6.0,<5.0.0
+types-PyYAML>=6.0.0,<7.0.0
+types-toml>=0.10.0,<1.0.0
+
+# Build tools
+build>=0.10.0,<1.0.0
+twine>=4.0.0,<5.0.0
+wheel>=0.41.0,<1.0.0
+
+# Performance profiling
+memory-profiler>=0.61.0,<1.0.0
+py-spy>=0.3.0,<1.0.0
+line-profiler>=4.1.0,<5.0.0
+
+# Linting and formatting
+pydocstyle[toml]>=6.3.0,<7.0.0
+yamllint>=1.32.0,<2.0.0
+markdownlint-cli>=0.35.0,<1.0.0
+
+# Development utilities
+ipython>=8.14.0,<9.0.0
+jupyter>=1.0.0,<2.0.0
+notebook>=7.0.0,<8.0.0
+
+# Database tools (for development/testing)
+alembic>=1.11.0,<2.0.0
+sqlite-utils>=3.34.0,<4.0.0
+
+# API development
+httpx>=0.24.0,<1.0.0  # For testing API clients
+respx>=0.20.0,<1.0.0  # HTTP mocking
+
+# Containerization
+docker>=6.1.0,<7.0.0
+
+# Monitoring and observability (dev)
+structlog>=23.1.0,<24.0.0
+rich>=13.5.0,<14.0.0  # Rich text and beautiful formatting
+
+# Task automation
+invoke>=2.2.0,<3.0.0  # Task runner alternative to Make
+
+# License checking
+pip-licenses>=4.3.0,<5.0.0
+
+# Dependency management
+pip-tools>=7.1.0,<8.0.0
+pipdeptree>=2.13.0,<3.0.0
