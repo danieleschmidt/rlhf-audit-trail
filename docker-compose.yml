@@ -1,0 +1,230 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        BUILD_DATE: ${BUILD_DATE:-2025-07-29}
+        VCS_REF: ${VCS_REF:-main}
+        VERSION: ${VERSION:-0.1.0}
+    container_name: rlhf-audit-trail-app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"  # Streamlit dashboard
+      - "8000:8000"  # FastAPI
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./audit_logs:/app/audit_logs
+      - ./checkpoints:/app/checkpoints
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - rlhf-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import rlhf_audit_trail; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Development service
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        BUILD_DATE: ${BUILD_DATE:-2025-07-29}
+        VCS_REF: ${VCS_REF:-main}
+    container_name: rlhf-audit-trail-dev
+    ports:
+      - "8501:8501"  # Streamlit
+      - "8000:8000"  # FastAPI
+      - "8888:8888"  # Jupyter
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit_dev
+    volumes:
+      - .:/workspace
+      - /workspace/src/rlhf_audit_trail/__pycache__
+      - dev-cache:/home/devuser/.cache
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - rlhf-network
+    stdin_open: true
+    tty: true
+
+  # Redis for caching and message queuing
+  redis:
+    image: redis:7-alpine
+    container_name: rlhf-audit-trail-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - rlhf-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rlhf-audit-trail-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=rlhf_audit
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - rlhf-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Celery worker for background tasks
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: rlhf-audit-trail-worker
+    restart: unless-stopped
+    command: celery -A rlhf_audit_trail.worker worker --loglevel=info
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./audit_logs:/app/audit_logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - rlhf-network
+
+  # Celery beat scheduler
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: rlhf-audit-trail-scheduler
+    restart: unless-stopped
+    command: celery -A rlhf_audit_trail.worker beat --loglevel=info
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - rlhf-network
+
+  # Monitoring with Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rlhf-audit-trail-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - rlhf-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rlhf-audit-trail-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - rlhf-network
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: rlhf-audit-trail-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/certs:/etc/nginx/certs
+    depends_on:
+      - app
+    networks:
+      - rlhf-network
+    profiles:
+      - with-proxy
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  dev-cache:
+    driver: local
+
+networks:
+  rlhf-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

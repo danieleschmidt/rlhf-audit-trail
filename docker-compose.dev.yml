@@ -1,0 +1,161 @@
+version: '3.8'
+
+# Development-specific docker-compose configuration
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Override app service for development
+  app:
+    build:
+      target: development
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit_dev
+      - PYTHONPATH=/workspace/src
+    volumes:
+      - .:/workspace
+      - /workspace/src/rlhf_audit_trail/__pycache__
+      - dev-node-modules:/workspace/node_modules
+    command: ["python", "-m", "rlhf_audit_trail.dashboard.app", "--dev"]
+    stdin_open: true
+    tty: true
+
+  # Development database with test data
+  postgres:
+    environment:
+      - POSTGRES_DB=rlhf_audit_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql
+      - ./scripts/seed-dev-data.sql:/docker-entrypoint-initdb.d/seed-dev-data.sql
+
+  # Development Redis with persistence disabled
+  redis:
+    command: redis-server --save "" --appendonly no
+    volumes:
+      - redis-dev-data:/data
+
+  # Jupyter notebook service for development
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: rlhf-audit-trail-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+      - JUPYTER_ENABLE_LAB=yes
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit_dev
+    volumes:
+      - .:/workspace
+      - jupyter-data:/home/devuser/.jupyter
+    command: ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - rlhf-network
+
+  # Development worker with auto-reload
+  worker:
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+      - LOG_LEVEL=DEBUG
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/rlhf_audit_dev
+    command: watchmedo auto-restart --directory=/app/src --pattern=*.py --recursive -- celery -A rlhf_audit_trail.worker worker --loglevel=debug
+    volumes:
+      - .:/workspace
+
+  # Development scheduler (disabled by default)
+  scheduler:
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+      - LOG_LEVEL=DEBUG
+    profiles:
+      - with-scheduler
+
+  # Development tools container
+  dev-tools:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: rlhf-audit-trail-dev-tools
+    volumes:
+      - .:/workspace
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=1
+    command: ["sleep", "infinity"]
+    networks:
+      - rlhf-network
+    profiles:
+      - dev-tools
+
+  # Local MinIO for S3-compatible storage testing
+  minio:
+    image: minio/minio:latest
+    container_name: rlhf-audit-trail-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - rlhf-network
+    profiles:
+      - with-storage
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: rlhf-audit-trail-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - rlhf-network
+    profiles:
+      - with-email
+
+  # Local documentation server
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: rlhf-audit-trail-docs
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+    command: ["mkdocs", "serve", "--dev-addr=0.0.0.0:8080"]
+    networks:
+      - rlhf-network
+    profiles:
+      - with-docs
+
+volumes:
+  postgres-dev-data:
+    driver: local
+  redis-dev-data:
+    driver: local
+  jupyter-data:
+    driver: local
+  minio-data:
+    driver: local
+  dev-node-modules:
+    driver: local

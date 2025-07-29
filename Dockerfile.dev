@@ -1,0 +1,115 @@
+# Development Docker image for RLHF Audit Trail
+# Optimized for development workflow with hot reloading and debugging tools
+
+FROM python:3.10-slim-bullseye
+
+# Set build arguments
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Add metadata
+LABEL maintainer="Daniel Schmidt <daniel@terragonlabs.com>"
+LABEL org.opencontainers.image.title="RLHF Audit Trail - Development"
+LABEL org.opencontainers.image.description="Development environment for RLHF Audit Trail"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    git \
+    curl \
+    wget \
+    vim \
+    nano \
+    htop \
+    tree \
+    jq \
+    sqlite3 \
+    redis-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create development user
+RUN groupadd --gid 1000 devuser \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash devuser \
+    && mkdir -p /home/devuser/.local/bin \
+    && chown -R devuser:devuser /home/devuser
+
+# Set up workspace
+WORKDIR /workspace
+
+# Set environment variables
+ENV PYTHONPATH="/workspace/src:$PYTHONPATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV ENVIRONMENT=development
+ENV DEBUG=1
+ENV LOG_LEVEL=DEBUG
+
+# Copy requirements first for better caching
+COPY requirements.txt requirements-dev.txt pyproject.toml ./
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel \
+    && pip install -r requirements-dev.txt
+
+# Copy source code
+COPY . .
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Switch to development user
+USER devuser
+
+# Install pre-commit hooks (as devuser)
+RUN pre-commit install || echo "Pre-commit install failed, will retry on first run"
+
+# Create common development directories
+RUN mkdir -p /home/devuser/.jupyter \
+    && mkdir -p /home/devuser/.config
+
+# Configure Jupyter for development
+RUN echo "c.NotebookApp.token = ''" > /home/devuser/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.password = ''" >> /home/devuser/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.open_browser = False" >> /home/devuser/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.ip = '0.0.0.0'" >> /home/devuser/.jupyter/jupyter_notebook_config.py \
+    && echo "c.NotebookApp.port = 8888" >> /home/devuser/.jupyter/jupyter_notebook_config.py
+
+# Configure Git (common development setup)
+RUN git config --global user.name "Dev User" \
+    && git config --global user.email "dev@localhost" \
+    && git config --global init.defaultBranch main
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import rlhf_audit_trail; print('Development environment OK')" || exit 1
+
+# Expose common development ports
+EXPOSE 8000    # FastAPI
+EXPOSE 8501    # Streamlit dashboard  
+EXPOSE 8888    # Jupyter
+EXPOSE 5000    # Flask (if needed)
+EXPOSE 3000    # Generic development server
+
+# Create startup script
+USER root
+RUN cat > /usr/local/bin/dev-entrypoint.sh << 'EOF'
+#!/bin/bash
+
+echo "🚀 Starting RLHF Audit Trail Development Environment"
+echo "=================================================="
+
+# Change to devuser
+su - devuser -c "cd /workspace && exec $@"
+EOF
+
+RUN chmod +x /usr/local/bin/dev-entrypoint.sh
+
+USER devuser
+
+# Default development command
+CMD ["/usr/local/bin/dev-entrypoint.sh", "bash"]

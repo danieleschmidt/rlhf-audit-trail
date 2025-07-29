@@ -1,0 +1,163 @@
+# Prometheus configuration for RLHF Audit Trail monitoring
+# This file configures metrics collection for compliance and performance monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  
+  # Labels to add to any time series or alerts when communicating with external systems
+  external_labels:
+    monitor: 'rlhf-audit-trail-monitor'
+    environment: 'production'
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'
+rule_files:
+  - "rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # RLHF Audit Trail application metrics
+  - job_name: 'rlhf-audit-trail-app'
+    static_configs:
+      - targets: ['app:8000']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    honor_labels: true
+    
+    # Compliance-specific metric collection
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'rlhf_.*'
+        target_label: component
+        replacement: 'rlhf-audit-trail'
+    
+    # Authentication for metrics endpoint (if needed)
+    # basic_auth:
+    #   username: 'metrics_user'
+    #   password: 'metrics_password'
+
+  # Streamlit dashboard metrics
+  - job_name: 'rlhf-dashboard'
+    static_configs:
+      - targets: ['app:8501']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    
+  # Celery worker metrics
+  - job_name: 'rlhf-worker'
+    static_configs:
+      - targets: ['worker:9540']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:9121']
+    scrape_interval: 15s
+    
+  # Redis exporter for detailed Redis metrics
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 15s
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    
+    # Relabeling for better organization
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'rlhf-audit-trail-host'
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Custom compliance metrics endpoint
+  - job_name: 'compliance-metrics'
+    static_configs:
+      - targets: ['app:8000']
+    scrape_interval: 60s  # Less frequent for compliance metrics
+    metrics_path: /compliance/metrics
+    
+    # Add compliance-specific labels
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'compliance_.*'
+        target_label: compliance_check
+        replacement: 'true'
+
+  # Audit trail integrity checks
+  - job_name: 'audit-integrity'
+    static_configs:
+      - targets: ['app:8000']
+    scrape_interval: 300s  # Every 5 minutes
+    metrics_path: /audit/integrity/metrics
+    
+  # Privacy metrics (differential privacy budget tracking)
+  - job_name: 'privacy-metrics'
+    static_configs:
+      - targets: ['app:8000']
+    scrape_interval: 60s
+    metrics_path: /privacy/metrics
+    
+    # Privacy-specific labels
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'privacy_.*'
+        target_label: privacy_component
+        replacement: 'differential_privacy'
+
+# Remote write configuration for long-term storage (optional)
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "remote_write_user"
+#       password: "remote_write_password"
+
+# Remote read configuration (optional)
+# remote_read:
+#   - url: "https://prometheus-remote-read-endpoint/api/v1/read"
+#     basic_auth:
+#       username: "remote_read_user"
+#       password: "remote_read_password"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      scheme: http
+      timeout: 10s
+      
+# Storage configuration
+storage:
+  tsdb:
+    # Retention settings
+    retention.time: 30d
+    retention.size: 10GB
+    
+    # Compression
+    wal-compression: true

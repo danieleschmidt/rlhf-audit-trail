@@ -1,0 +1,411 @@
+name: Compliance Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run compliance checks daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      framework:
+        description: 'Compliance framework to validate'
+        required: true
+        default: 'eu-ai-act'
+        type: choice
+        options:
+          - eu-ai-act
+          - nist-framework
+          - all
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  eu-ai-act-compliance:
+    name: EU AI Act Compliance Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.framework == 'eu-ai-act' || github.event.inputs.framework == 'all' || github.event.inputs.framework == ''
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies  
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml
+
+    - name: Run EU AI Act compliance validation
+      id: eu-compliance
+      run: |
+        python compliance/compliance-validator.py --format json --output eu-ai-act-report.json --verbose
+      continue-on-error: true
+
+    - name: Generate compliance summary
+      if: always()
+      run: |
+        if [ -f "eu-ai-act-report.json" ]; then
+          python -c "
+          import json
+          with open('eu-ai-act-report.json', 'r') as f:
+              data = json.load(f)
+          summary = data['compliance_report']['summary']
+          print(f\"🔍 EU AI Act Compliance Summary\")
+          print(f\"Overall Status: {summary['overall_status']}\")
+          print(f\"Compliance Score: {summary['compliance_score']}%\")
+          print(f\"Passed: {summary['passed']}\")
+          print(f\"Failed: {summary['failed']}\")
+          print(f\"Warnings: {summary['warnings']}\")
+          print(f\"Critical Failures: {summary['critical_failures']}\")
+          
+          # Set GitHub Actions outputs
+          import os
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f\"compliance_score={summary['compliance_score']}\n\")
+              f.write(f\"overall_status={summary['overall_status']}\n\")
+              f.write(f\"critical_failures={summary['critical_failures']}\n\")
+          "
+        else
+          echo "❌ Compliance report not generated"
+          echo "compliance_score=0" >> $GITHUB_OUTPUT
+          echo "overall_status=ERROR" >> $GITHUB_OUTPUT
+          echo "critical_failures=999" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload compliance report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: eu-ai-act-compliance-report
+        path: |
+          eu-ai-act-report.json
+        retention-days: 90
+
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const fs = require('fs');
+          
+          let reportData = {};
+          try {
+            const reportContent = fs.readFileSync('eu-ai-act-report.json', 'utf8');
+            reportData = JSON.parse(reportContent);
+          } catch (error) {
+            console.log('Could not read compliance report');
+            return;
+          }
+          
+          const summary = reportData.compliance_report.summary;
+          const statusEmoji = summary.overall_status === 'COMPLIANT' ? '✅' : '❌';
+          const scoreColor = summary.compliance_score >= 90 ? '🟢' : summary.compliance_score >= 70 ? '🟡' : '🔴';
+          
+          const comment = `## ${statusEmoji} EU AI Act Compliance Report
+          
+          **Overall Status:** ${summary.overall_status}
+          **Compliance Score:** ${scoreColor} ${summary.compliance_score}%
+          
+          ### Summary
+          - ✅ **Passed:** ${summary.passed}
+          - ❌ **Failed:** ${summary.failed}
+          - ⚠️ **Warnings:** ${summary.warnings}
+          - 🚨 **Critical Failures:** ${summary.critical_failures}
+          
+          ${summary.critical_failures > 0 ? '⚠️ **Critical failures detected - immediate attention required**' : ''}
+          
+          <details>
+          <summary>View detailed results</summary>
+          
+          ${reportData.compliance_report.results.map(result => {
+            const emoji = result.status === 'pass' ? '✅' : result.status === 'fail' ? '❌' : '⚠️';
+            return `${emoji} **${result.check_id}:** ${result.title}\n- Status: ${result.status}\n- Level: ${result.level}\n- Message: ${result.message}${result.remediation ? '\n- Remediation: ' + result.remediation : ''}\n`;
+          }).join('\n')}
+          
+          </details>
+          
+          ---
+          *Generated by EU AI Act Compliance Validator*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+    - name: Fail if critical compliance issues
+      if: always()
+      run: |
+        if [ "${{ steps.eu-compliance.outcome }}" = "failure" ]; then
+          echo "❌ EU AI Act compliance validation failed"
+          exit 1
+        fi
+
+  nist-framework-compliance:
+    name: NIST Framework Compliance Check
+    runs-on: ubuntu-latest
+    if: github.event.inputs.framework == 'nist-framework' || github.event.inputs.framework == 'all'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml
+
+    - name: Run NIST Framework compliance validation
+      run: |
+        echo "🔍 NIST AI Framework compliance check"
+        echo "Implementation pending - placeholder for NIST-specific checks"
+        
+        # Create placeholder report
+        cat > nist-framework-report.json << 'EOF'
+        {
+          "compliance_report": {
+            "metadata": {
+              "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "framework": "NIST AI Framework",
+              "status": "PENDING_IMPLEMENTATION"
+            },
+            "summary": {
+              "total_checks": 0,
+              "passed": 0,
+              "failed": 0,
+              "warnings": 0,
+              "compliance_score": 0,
+              "overall_status": "PENDING"
+            },
+            "results": []
+          }
+        }
+        EOF
+
+    - name: Upload NIST compliance report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: nist-framework-compliance-report
+        path: nist-framework-report.json
+        retention-days: 90
+
+  documentation-compliance:
+    name: Documentation Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check required documentation files
+      run: |
+        echo "📋 Checking required documentation files..."
+        
+        required_files=(
+          "README.md"
+          "LICENSE"
+          "CONTRIBUTING.md"
+          "CODE_OF_CONDUCT.md"
+          "SECURITY.md"
+          "CHANGELOG.md"
+        )
+        
+        missing_files=()
+        
+        for file in "${required_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✅ $file - Found"
+          else
+            echo "❌ $file - Missing"
+            missing_files+=("$file")
+          fi
+        done
+        
+        if [ ${#missing_files[@]} -eq 0 ]; then
+          echo "✅ All required documentation files present"
+        else
+          echo "❌ Missing documentation files: ${missing_files[*]}"
+          exit 1
+        fi
+
+    - name: Check documentation quality
+      run: |
+        echo "📖 Checking documentation quality..."
+        
+        # Check README completeness
+        if [ -f "README.md" ]; then
+          readme_content=$(cat README.md)
+          
+          required_sections=("installation" "usage" "requirements" "license" "contributing")
+          missing_sections=()
+          
+          for section in "${required_sections[@]}"; do
+            if echo "$readme_content" | grep -qi "$section"; then
+              echo "✅ README contains $section section"
+            else
+              echo "⚠️ README missing $section section"
+              missing_sections+=("$section")
+            fi
+          done
+          
+          if [ ${#missing_sections[@]} -gt 0 ]; then
+            echo "⚠️ README could be improved by adding: ${missing_sections[*]}"
+          fi
+        fi
+
+  security-compliance:
+    name: Security Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check security configuration files
+      run: |
+        echo "🔒 Checking security configuration files..."
+        
+        security_files=(
+          ".bandit"
+          ".safety-policy.yml"
+          ".secrets.baseline"
+          "security/security-checklist.md"
+        )
+        
+        for file in "${security_files[@]}"; do
+          if [ -f "$file" ]; then
+            echo "✅ $file - Found"
+          else
+            echo "⚠️ $file - Not found"
+          fi
+        done
+
+    - name: Check GitHub security features
+      run: |
+        echo "🛡️ Checking GitHub security configuration..."
+        
+        # Check if security workflows exist
+        if [ -f ".github/workflows/security.yml" ]; then
+          echo "✅ Security workflow configured"
+        else
+          echo "❌ Security workflow missing"
+        fi
+        
+        # Check if Dependabot is configured
+        if [ -f ".github/dependabot.yml" ]; then
+          echo "✅ Dependabot configured"
+        else
+          echo "❌ Dependabot configuration missing"
+        fi
+
+  generate-compliance-summary:
+    name: Generate Compliance Summary
+    runs-on: ubuntu-latest
+    needs: [eu-ai-act-compliance, documentation-compliance, security-compliance]
+    if: always()
+    
+    steps:
+    - name: Download all compliance reports
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+
+    - name: Generate overall compliance summary
+      run: |
+        echo "📊 Overall Compliance Summary" > compliance-summary.md
+        echo "==============================" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        echo "Generated on: $(date -u)" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        
+        echo "## Compliance Checks Performed" >> compliance-summary.md
+        echo "- EU AI Act Compliance: ${{ needs.eu-ai-act-compliance.result }}" >> compliance-summary.md
+        echo "- Documentation Compliance: ${{ needs.documentation-compliance.result }}" >> compliance-summary.md
+        echo "- Security Compliance: ${{ needs.security-compliance.result }}" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        
+        # Check if any critical issues
+        overall_status="✅ COMPLIANT"
+        if [[ "${{ needs.eu-ai-act-compliance.result }}" == "failure" ]]; then
+          overall_status="❌ NON-COMPLIANT"
+        fi
+        
+        echo "## Overall Status: $overall_status" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        
+        if [ -f "eu-ai-act-compliance-report/eu-ai-act-report.json" ]; then
+          echo "## EU AI Act Details" >> compliance-summary.md
+          python3 -c "
+          import json, sys
+          try:
+              with open('eu-ai-act-compliance-report/eu-ai-act-report.json', 'r') as f:
+                  data = json.load(f)
+              summary = data['compliance_report']['summary']
+              print(f'- Compliance Score: {summary[\"compliance_score\"]}%')
+              print(f'- Passed: {summary[\"passed\"]}')
+              print(f'- Failed: {summary[\"failed\"]}')
+              print(f'- Warnings: {summary[\"warnings\"]}')
+              print(f'- Critical Failures: {summary[\"critical_failures\"]}')
+          except:
+              print('Unable to parse compliance report')
+          " >> compliance-summary.md
+        fi
+
+    - name: Upload compliance summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: compliance-summary
+        path: compliance-summary.md
+        retention-days: 90
+
+    - name: Create issue for compliance failures
+      if: needs.eu-ai-act-compliance.result == 'failure' && github.event_name == 'schedule'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const title = '🚨 Compliance Validation Failed';
+          const body = `
+          ## Compliance Validation Failure
+          
+          The automated compliance validation has detected critical issues that require immediate attention.
+          
+          **Failed Checks:**
+          - EU AI Act Compliance: ${{ needs.eu-ai-act-compliance.result }}
+          
+          **Next Steps:**
+          1. Review the compliance report artifacts
+          2. Address critical compliance failures
+          3. Re-run compliance validation
+          4. Update documentation as needed
+          
+          **Compliance Reports:**
+          - [Workflow Run](${context.payload.repository.html_url}/actions/runs/${context.runId})
+          
+          This issue was automatically created by the compliance validation workflow.
+          `;
+          
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['compliance', 'critical', 'automated']
+          });

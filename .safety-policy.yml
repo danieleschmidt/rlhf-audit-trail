@@ -1,0 +1,71 @@
+# Safety policy configuration for RLHF Audit Trail
+# This file configures the Safety CLI to check for known security vulnerabilities
+
+# Security database settings
+database:
+  # Use the latest vulnerability database
+  update: true
+  # Full database scan
+  full_report: true
+
+# Vulnerability severity settings
+severity:
+  # Minimum severity level to report (low, medium, high, critical)
+  minimum: "medium"
+  # Exit codes for different severity levels
+  exit_codes:
+    low: 0
+    medium: 1
+    high: 2
+    critical: 3
+
+# Package-specific configurations
+packages:
+  # Allow certain known issues that are false positives or acceptable risks
+  ignore:
+    # Example: Ignore specific vulnerability IDs that are not applicable
+    # - 12345  # CVE-2023-12345 - Not applicable to our use case
+    
+  # Exclude development dependencies from production security checks
+  exclude_dev: false
+
+# Reporting settings
+reporting:
+  # Output format (json, xml, text, screen)
+  format: "json"
+  # Include full vulnerability details
+  full_report: true
+  # Include affected versions
+  affected_versions: true
+  
+# Compliance settings
+compliance:
+  # EU AI Act requirements
+  eu_ai_act: true
+  # NIST framework compatibility  
+  nist_framework: true
+  # Include CVSS scores
+  include_cvss: true
+
+# CI/CD integration
+ci:
+  # Continue on vulnerabilities (set to false to fail CI)
+  continue_on_error: false
+  # Maximum allowed vulnerabilities by severity
+  max_vulnerabilities:
+    critical: 0
+    high: 0
+    medium: 5  # Allow some medium severity for development
+    low: 10
+
+# Custom vulnerability database sources
+sources:
+  # Primary PyUp.io database (default)
+  - name: "pyup"
+    url: "https://pyup.io/api/v1/vulnerabilities/"
+    enabled: true
+  
+  # Additional sources can be added here
+  # - name: "custom"
+  #   url: "https://example.com/vuln-db/"
+  #   enabled: false

@@ -1,0 +1,247 @@
+name: Security
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans on Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, GPL-3.0
+
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner in repo mode
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  semgrep:
+    name: Semgrep Security Scan
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Semgrep
+      run: |
+        semgrep --config=auto --sarif --output=semgrep.sarif src/
+      continue-on-error: true
+
+    - name: Upload Semgrep results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+
+  osv-scanner:
+    name: OSV Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run OSV Scanner
+      uses: google/osv-scanner-action@v1
+      with:
+        scan-args: |-
+          -r
+          --skip-git
+          .
+        format: sarif
+        output: osv-results.sarif
+      continue-on-error: true
+
+    - name: Upload OSV scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: osv-results.sarif
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install detect-secrets
+      run: |
+        pip install detect-secrets
+
+    - name: Run secrets detection
+      run: |
+        detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins --all-files
+
+    - name: Verify secrets baseline
+      run: |
+        detect-secrets audit .secrets.baseline
+
+  supply-chain:
+    name: Supply Chain Security
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install pip-audit
+      run: |
+        pip install pip-audit
+
+    - name: Run pip-audit
+      run: |
+        pip-audit --desc --format=json --output=pip-audit-report.json
+      continue-on-error: true
+
+    - name: Upload supply chain scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: supply-chain-results
+        path: pip-audit-report.json
+        retention-days: 90
+
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        pip install pip-licenses
+
+    - name: Check licenses
+      run: |
+        pip install -e .
+        pip-licenses --format=json --output-file=licenses.json --allow-only="MIT;Apache Software License;BSD License;ISC License (ISCL);GNU General Public License v3 (GPLv3)"
+
+    - name: Upload license results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: license-results
+        path: licenses.json
+        retention-days: 90
+
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [codeql, trivy-scan, semgrep, osv-scanner, secrets-scan, supply-chain, license-check]
+    if: always()
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      continue-on-error: true
+
+    - name: Generate security summary
+      run: |
+        echo "# Security Scan Summary" > security-summary.md
+        echo "Generated on: $(date)" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "## Scans Performed" >> security-summary.md
+        echo "- ✅ CodeQL Analysis" >> security-summary.md
+        echo "- ✅ Trivy Vulnerability Scan" >> security-summary.md
+        echo "- ✅ Semgrep Security Scan" >> security-summary.md
+        echo "- ✅ OSV Vulnerability Scanner" >> security-summary.md
+        echo "- ✅ Secrets Detection" >> security-summary.md
+        echo "- ✅ Supply Chain Security" >> security-summary.md
+        echo "- ✅ License Compliance Check" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "See individual job results for detailed findings." >> security-summary.md
+
+    - name: Upload security summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-summary
+        path: security-summary.md
+        retention-days: 90

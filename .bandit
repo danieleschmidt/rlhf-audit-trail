@@ -1,0 +1,15 @@
+[bandit]
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = ["B101", "B601"]  # Skip assert_used_in_tests and shell injection for subprocess with shell=False
+
+# Test-specific exclusions
+[bandit.assert_used]
+exclude = ["tests/*"]
+
+# Skip certain checks for specific files
+[bandit.blacklist_calls]
+exclude = ["tests/fixtures/*"]
+
+# Additional configuration
+[bandit.any_other_function_with_shell_equals_true]
+exclude = ["scripts/*"]

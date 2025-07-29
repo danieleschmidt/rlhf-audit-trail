@@ -1,0 +1,374 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "RLHF Audit Trail - Overview",
+    "tags": ["rlhf", "audit", "compliance", "overview"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Status",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=\"rlhf-audit-trail-app\"}",
+            "legendFormat": "Application",
+            "refId": "A"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "legendFormat": "Redis",
+            "refId": "B"
+          },
+          {
+            "expr": "up{job=\"postgres\"}",
+            "legendFormat": "Database",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "DOWN"}}, "type": "value"},
+              {"options": {"1": {"text": "UP"}}, "type": "value"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Compliance Score",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "compliance_score_percentage",
+            "legendFormat": "Compliance Score",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "green", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active RLHF Training Sessions",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rlhf_training_sessions_active",
+            "legendFormat": "Active Sessions",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "palette-classic"},
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Audit Log Integrity Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "audit_log_integrity_check_passed",
+            "legendFormat": "Integrity Check",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "FAILED"}}, "type": "value"},
+              {"options": {"1": {"text": "PASSED"}}, "type": "value"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Privacy Budget Usage",
+        "type": "bargauge",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "privacy_epsilon_used / privacy_epsilon_total * 100",
+            "legendFormat": "Epsilon Budget Used (%)",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Critical Compliance Violations",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
+        "targets": [
+          {
+            "expr": "compliance_violations_critical_total",
+            "legendFormat": "Critical Violations",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"rlhf-audit-trail-app\"}[5m])",
+            "legendFormat": "{{method}} {{path}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {"label": "Requests/sec", "show": true},
+          {"show": false}
+        ],
+        "xAxis": {"show": true},
+        "legend": {"show": true}
+      },
+      {
+        "id": 8,
+        "title": "Response Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"rlhf-audit-trail-app\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"rlhf-audit-trail-app\"}[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"label": "Seconds", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Annotations Per Hour",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(rlhf_annotations_total[1h])",
+            "legendFormat": "Annotations/hour",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {"label": "Annotations", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Model Training Progress",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rlhf_training_epoch_current",
+            "legendFormat": "Current Epoch",
+            "refId": "A"
+          },
+          {
+            "expr": "rlhf_training_loss",
+            "legendFormat": "Training Loss",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"label": "Epoch/Loss", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 11,
+        "title": "System Resource Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{name=\"rlhf-audit-trail-app\"}[5m]) * 100",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "container_memory_usage_bytes{name=\"rlhf-audit-trail-app\"} / 1024 / 1024 / 1024",
+            "legendFormat": "Memory Usage (GB)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {"label": "CPU % / Memory GB", "show": true},
+          {"show": false}
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Compliance Check Results (Last 24h)",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "compliance_check_result",
+            "format": "table",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "check_id": "Check ID",
+                "check_name": "Check Name", 
+                "status": "Status",
+                "level": "Severity",
+                "timestamp": "Last Run"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "query": "label_values(up, environment)",
+          "current": {"value": "production", "text": "production"},
+          "options": [],
+          "includeAll": false,
+          "multi": false
+        },
+        {
+          "name": "instance",
+          "type": "query", 
+          "query": "label_values(up{job=\"rlhf-audit-trail-app\"}, instance)",
+          "current": {"value": "all", "text": "All"},
+          "options": [],
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "type": "prometheus",
+          "expr": "changes(prometheus_config_last_reload_success_timestamp_seconds[1h]) > 0",
+          "titleFormat": "Config Reload",
+          "textFormat": "Prometheus config reloaded"
+        },
+        {
+          "name": "Compliance Failures",
+          "type": "prometheus", 
+          "expr": "increase(compliance_violations_critical_total[1h]) > 0",
+          "titleFormat": "Critical Compliance Violation",
+          "textFormat": "{{violation_type}}: {{description}}"
+        }
+      ]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 1,
+    "links": [
+      {
+        "title": "RLHF Dashboard",
+        "url": "/d/rlhf-detailed/rlhf-audit-trail-detailed",
+        "type": "dashboards"
+      },
+      {
+        "title": "Compliance Dashboard", 
+        "url": "/d/compliance/compliance-monitoring",
+        "type": "dashboards"
+      }
+    ],
+    "schemaVersion": 27,
+    "version": 1,
+    "weekStart": ""
+  }
+}
