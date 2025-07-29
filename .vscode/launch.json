@@ -1,0 +1,172 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Current File",
+      "type": "python",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Health Check",
+      "type": "python",
+      "request": "launch",
+      "module": "rlhf_audit_trail.health_check",
+      "args": ["--verbose"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "ENVIRONMENT": "development"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Run Benchmarks",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/benchmarks/run_benchmarks.py",
+      "args": ["--quick", "--output", "benchmarks/results/debug_results.json"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Pytest",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--tb=short",
+        "--no-cov"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "TESTING": "true",
+        "ENVIRONMENT": "test"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Pytest Current File",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}",
+        "-v",
+        "--tb=short",
+        "--no-cov"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "TESTING": "true",
+        "ENVIRONMENT": "test"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Debug Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--tb=long",
+        "--no-cov",
+        "--pdb"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "TESTING": "true",
+        "ENVIRONMENT": "test"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Compliance Check",
+      "type": "python",
+      "request": "launch",
+      "module": "rlhf_audit_trail.compliance.check_eu_ai_act",
+      "args": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: FastAPI Debug",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "rlhf_audit_trail.api.main:app",
+        "--host", "0.0.0.0",
+        "--port", "8000",
+        "--reload",
+        "--log-level", "debug"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "ENVIRONMENT": "development",
+        "DEBUG": "true"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Streamlit Dashboard",
+      "type": "python",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "src/rlhf_audit_trail/dashboard/app.py",
+        "--server.port", "8501",
+        "--server.headless", "false"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Docker: Attach to Container",
+      "type": "python",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "/app"
+        }
+      ]
+    }
+  ]
+}
