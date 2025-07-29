@@ -205,3 +205,40 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Machine Learning / AI specific
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+wandb/
+mlruns/
+.tensorboard/
+lightning_logs/
+
+# RLHF Audit Trail specific
+audit_logs/
+checkpoints/
+model_cards/
+privacy_reports/
+compliance_exports/
+annotator_data/
+
+# Cloud storage credentials
+.aws/
+.gcp/
+.azure/
+gcp-key.json
+
+# Secrets and API keys
+*.key
+*.pem
+*.crt
+secrets.json
+credentials.json
+.env.local
+.env.production
