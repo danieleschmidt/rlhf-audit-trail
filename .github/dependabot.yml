@@ -1,0 +1,149 @@
+# Dependabot configuration for RLHF Audit Trail
+# Advanced dependency management for high-maturity Python AI/ML project
+
+version: 2
+
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "terragon-labs"
+    assignees:
+      - "danieleschmidt"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    milestone: "v1.0"
+    
+    # Advanced configuration for AI/ML dependencies
+    groups:
+      # Core ML/AI dependencies - critical updates
+      ml-core:
+        patterns:
+          - "torch*"
+          - "transformers*"
+          - "trlx*"
+          - "numpy"
+          - "pandas"
+          - "scikit-learn"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Security and compliance - high priority
+      security:
+        patterns:
+          - "cryptography*" 
+          - "bandit*"
+          - "safety*"
+          - "detect-secrets*"
+          - "opacus*"
+        update-types:
+          - "security"
+          - "patch"
+      
+      # Development and testing tools
+      dev-tools:
+        patterns:
+          - "pytest*"
+          - "black*"
+          - "ruff*"
+          - "mypy*"
+          - "pre-commit*"
+          - "tox*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      # Infrastructure and deployment
+      infra:
+        patterns:
+          - "fastapi*"
+          - "sqlalchemy*"
+          - "pydantic*"
+          - "redis*"
+          - "celery*"
+          - "boto3*"
+        update-types:
+          - "patch"
+
+    # Ignore specific packages that need manual review
+    ignore:
+      # Major version updates for critical ML dependencies
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "transformers"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "trlx"
+        update-types: ["version-update:semver-major"]
+      
+      # Pin specific versions for stability
+      - dependency-name: "numpy"
+        versions: ["2.0.0"]  # Known compatibility issues
+      
+    # Custom branch prefix
+    target-branch: "main"
+    rebase-strategy: "auto"
+    
+    # Vulnerability alerts - immediate action
+    vulnerability-alerts:
+      enabled: true
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "terragon-labs"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions workflow dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "terragon-labs"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci"
+
+# Security and compliance settings
+registries:
+  # Private registries can be configured here if needed
+  pypi:
+    type: python-index
+    url: https://pypi.org/simple
+    replaces-base: false
+
+# Advanced features for enterprise use
+enable-beta-ecosystems: true

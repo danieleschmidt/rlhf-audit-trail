@@ -1,0 +1,163 @@
+# SBOM (Software Bill of Materials) Configuration
+# SPDX-License-Identifier: Apache-2.0
+# This configuration enables advanced supply chain security for RLHF Audit Trail
+
+# SBOM Metadata
+sbom_version: "SPDX-2.3"
+data_license: "CC0-1.0"
+document_name: "RLHF-Audit-Trail-SBOM"
+document_namespace: "https://github.com/terragonlabs/rlhf-audit-trail"
+creation_info:
+  created: "2025-07-30T00:00:00Z"
+  creators:
+    - "Tool: syft"
+    - "Tool: cyclonedx-python"
+    - "Organization: Terragon Labs"
+
+# Package Information  
+package:
+  name: "rlhf-audit-trail"
+  spdx_id: "SPDXRef-Package"
+  download_location: "https://github.com/terragonlabs/rlhf-audit-trail"
+  files_analyzed: true
+  verification_code: "auto-generated"
+  homepage: "https://github.com/terragonlabs/rlhf-audit-trail"
+  copyright_text: "Copyright 2025 Terragon Labs"
+  license_concluded: "Apache-2.0"
+  license_declared: "Apache-2.0"
+
+# Vulnerability Database Integration
+vulnerability_databases:
+  - name: "OSV"
+    url: "https://osv.dev"
+  - name: "NVD"
+    url: "https://nvd.nist.gov"
+  - name: "PyPA Advisory Database"
+    url: "https://github.com/pypa/advisory-database"
+
+# Supply Chain Security Configuration
+supply_chain:
+  # SLSA (Supply-chain Levels for Software Artifacts) Configuration
+  slsa:
+    level: 3
+    build_platform: "GitHub Actions"
+    provenance_generation: true
+    hermetic_builds: true
+    two_party_review: true
+  
+  # Signature Verification
+  signatures:
+    enabled: true
+    keyless_signing: true  # Using Sigstore/Cosign
+    attestation_policy: "require"
+  
+  # Dependency Tracking
+  dependencies:
+    track_transitive: true
+    vulnerability_scanning: true
+    license_compliance: true
+    update_notifications: true
+
+# Critical Dependencies for Enhanced Monitoring
+critical_dependencies:
+  # ML/AI Core Dependencies
+  - name: "torch"
+    category: "ml-framework"
+    criticality: "high"
+    security_monitoring: true
+    update_policy: "manual-review"
+    
+  - name: "transformers"
+    category: "ml-framework" 
+    criticality: "high"
+    security_monitoring: true
+    update_policy: "manual-review"
+    
+  - name: "trlx"
+    category: "ml-framework"
+    criticality: "high"
+    security_monitoring: true
+    update_policy: "manual-review"
+
+  # Security Dependencies
+  - name: "cryptography"
+    category: "security"
+    criticality: "critical"
+    security_monitoring: true
+    update_policy: "auto-patch"
+    
+  - name: "opacus"
+    category: "privacy"
+    criticality: "high"
+    security_monitoring: true
+    update_policy: "manual-review"
+
+  # Infrastructure Dependencies  
+  - name: "fastapi"
+    category: "web-framework"
+    criticality: "medium"
+    security_monitoring: true
+    update_policy: "auto-minor"
+    
+  - name: "sqlalchemy"
+    category: "database"
+    criticality: "medium"
+    security_monitoring: true
+    update_policy: "auto-minor"
+
+# Compliance Frameworks
+compliance:
+  frameworks:
+    - name: "EU AI Act"
+      requirements:
+        - "provenance_tracking"
+        - "transparency_documentation"
+        - "risk_assessment"
+    - name: "NIST AI RMF"
+      requirements:
+        - "supply_chain_security"
+        - "trustworthy_ai"
+        - "risk_management"
+    - name: "SLSA"
+      level: 3
+      requirements:
+        - "source_integrity"
+        - "build_integrity"
+        - "provenance_available"
+
+# Automation Configuration
+automation:
+  sbom_generation:
+    frequency: "on_release"
+    formats: ["spdx-json", "cyclonedx-json", "cyclonedx-xml"]
+    upload_artifacts: true
+    
+  vulnerability_scanning:
+    frequency: "daily"
+    tools: ["trivy", "grype", "osv-scanner"]
+    fail_on: ["critical", "high"]
+    
+  license_scanning:
+    frequency: "weekly"
+    approved_licenses:
+      - "Apache-2.0"
+      - "MIT"
+      - "BSD-3-Clause"
+      - "BSD-2-Clause"
+    forbidden_licenses:
+      - "GPL-3.0"
+      - "AGPL-3.0"
+      - "SSPL-1.0"
+
+# Integration Points
+integrations:
+  container_registries:
+    - "ghcr.io"
+  package_repositories:
+    - "pypi.org"
+  security_platforms:
+    - "GitHub Security"
+    - "Dependabot"
+  monitoring:
+    - "Prometheus"
+    - "Grafana"
