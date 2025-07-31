@@ -1,0 +1,36 @@
+# CODEOWNERS - Automated code review assignments
+# This file defines who owns specific parts of the codebase for automated review requests
+
+# Global repository ownership
+* @danieleschmidt @terragonlabs/core-team
+
+# Critical security and compliance files
+/security/ @danieleschmidt @terragonlabs/security-team
+/compliance/ @danieleschmidt @terragonlabs/compliance-team
+SECURITY.md @danieleschmidt @terragonlabs/security-team
+sbom.yaml @danieleschmidt @terragonlabs/security-team
+
+# AI/ML core components
+/src/rlhf_audit_trail/ @danieleschmidt @terragonlabs/ml-team
+/benchmarks/ @danieleschmidt @terragonlabs/ml-team
+
+# Infrastructure and deployment
+/deploy/ @danieleschmidt @terragonlabs/devops-team
+/monitoring/ @danieleschmidt @terragonlabs/devops-team
+docker-compose*.yml @danieleschmidt @terragonlabs/devops-team
+Dockerfile* @danieleschmidt @terragonlabs/devops-team
+
+# Documentation and processes
+/docs/ @danieleschmidt @terragonlabs/docs-team
+*.md @danieleschmidt @terragonlabs/docs-team
+
+# Build and dependency management
+pyproject.toml @danieleschmidt @terragonlabs/core-team
+requirements*.txt @danieleschmidt @terragonlabs/core-team
+requirements*.in @danieleschmidt @terragonlabs/core-team
+Makefile @danieleschmidt @terragonlabs/core-team
+
+# Testing infrastructure
+/tests/ @danieleschmidt @terragonlabs/qa-team
+pytest.ini @danieleschmidt @terragonlabs/qa-team
+tox.ini @danieleschmidt @terragonlabs/qa-team
