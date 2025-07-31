@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/terragonlabs/rlhf-audit-trail/discussions
+    about: Ask questions, share ideas, or discuss the project with the community
+  - name: 🔒 Security Issues
+    url: mailto:security@terragonlabs.com
+    about: Report security vulnerabilities privately via email
+  - name: 📚 Documentation
+    url: https://rlhf-audit-trail.readthedocs.io/
+    about: Check our comprehensive documentation
+  - name: 💼 Commercial Support
+    url: mailto:enterprise@terragonlabs.com
+    about: Contact us for enterprise support and professional services
