@@ -1,0 +1,212 @@
+# OpenTelemetry Collector configuration for RLHF Audit Trail
+# Collects traces, metrics, and logs for comprehensive observability
+
+receivers:
+  # OTLP receiver for traces and metrics
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Prometheus receiver for metrics scraping
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+
+  # Host metrics
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      disk:
+      filesystem:
+        metrics:
+          system.filesystem.utilization:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      network:
+      process:
+        mute_process_name_error: true
+
+  # Docker stats receiver
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+
+processors:
+  # Batch processor for performance
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 256
+    spike_limit_mib: 64
+    check_interval: 5s
+
+  # Resource processor for adding attributes
+  resource:
+    attributes:
+      - key: service.name
+        value: rlhf-audit-trail
+        action: insert
+      - key: service.version
+        from_attribute: service.version
+        action: insert
+      - key: deployment.environment
+        value: production
+        action: insert
+      - key: rlhf.component
+        from_attribute: component
+        action: insert
+
+  # Attributes processor for compliance tracking
+  attributes/compliance:
+    actions:
+      - key: compliance.framework
+        value: eu_ai_act
+        action: insert
+      - key: privacy.enabled
+        value: true
+        action: insert
+      - key: audit.enabled
+        value: true
+        action: insert
+
+  # Filter processor for sensitive data
+  filter/privacy:
+    traces:
+      span:
+        - 'attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*password.*")'
+        - 'attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*token.*")'
+        - 'attributes["http.url"] != nil and IsMatch(attributes["http.url"], ".*secret.*")'
+    metrics:
+      metric:
+        - 'name == "http_requests_total" and attributes["endpoint"] != nil and IsMatch(attributes["endpoint"], ".*auth.*")'
+
+  # Probabilistic sampler for traces
+  probabilistic_sampler:
+    sampling_percentage: 10.0
+
+  # Transform processor for metric transformation
+  transform/metrics:
+    metric_statements:
+      - context: metric
+        statements:
+          - set(description, "RLHF Audit Trail custom metric") where name == "rlhf_custom_metric"
+
+exporters:
+  # Jaeger exporter for traces
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: rlhf_audit_trail
+    const_labels:
+      environment: production
+      service: rlhf-audit-trail
+
+  # Prometheus remote write
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Loki exporter for logs
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    labels:
+      attributes:
+        service.name: "service_name"
+        level: "level"
+      resource:
+        container.name: "container_name"
+
+  # Debug exporter for troubleshooting
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # Logging exporter
+  logging:
+    loglevel: info
+
+  # OTLP exporter for forwarding
+  otlp/jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # zPages extension
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+  # Memory ballast
+  memory_ballast:
+    size_mib: 64
+
+service:
+  extensions: [health_check, pprof, zpages, memory_ballast]
+  
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes/compliance, filter/privacy, probabilistic_sampler, batch]
+      exporters: [jaeger, debug]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics, docker_stats]
+      processors: [memory_limiter, resource, attributes/compliance, transform/metrics, batch]
+      exporters: [prometheus, prometheusremotewrite, debug]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes/compliance, filter/privacy, batch]
+      exporters: [loki, debug]
+
+  # Telemetry configuration
+  telemetry:
+    logs:
+      level: info
+      development: false
+      sampling:
+        enabled: true
+        tick: 10s
+        initial: 5
+        thereafter: 200
+    metrics:
+      level: basic
+      address: 0.0.0.0:8888
+    traces:
+      level: basic

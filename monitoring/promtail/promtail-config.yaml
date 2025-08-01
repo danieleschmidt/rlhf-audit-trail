@@ -1,0 +1,323 @@
+# Promtail configuration for RLHF Audit Trail log collection
+# Collects application logs with compliance labeling and privacy filtering
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only scrape containers with specific labels
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: service
+      - source_labels: ['__meta_docker_container_name']
+        target_label: container
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: project
+      
+      # Add RLHF-specific labels
+      - source_labels: ['__meta_docker_container_label_rlhf_component']
+        target_label: rlhf_component
+      - source_labels: ['__meta_docker_container_label_compliance_required']
+        target_label: compliance_required
+      - source_labels: ['__meta_docker_container_label_privacy_sensitive']
+        target_label: privacy_sensitive
+    
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            logger: logger
+            trace_id: trace_id
+            span_id: span_id
+            user_id: user_id
+            session_id: session_id
+            compliance_event: compliance_event
+            privacy_event: privacy_event
+            audit_event: audit_event
+      
+      # Set timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Add compliance labels
+      - labels:
+          level:
+          logger:
+          service:
+          container:
+          compliance_event:
+          privacy_event:
+          audit_event:
+      
+      # Privacy filtering - redact sensitive information
+      - replace:
+          expression: '(?i)(password|token|secret|key)=[^\s]*'
+          replace: '${1}=***REDACTED***'
+      - replace:
+          expression: '(?i)("password"|"token"|"secret"|"key"):\s*"[^"]*"'
+          replace: '${1}: "***REDACTED***"'
+      - replace:
+          expression: '\b\d{3}-\d{2}-\d{4}\b'  # SSN pattern
+          replace: '***SSN-REDACTED***'
+      - replace:
+          expression: '\b[\w\.-]+@[\w\.-]+\.\w+\b'  # Email pattern
+          replace: '***EMAIL-REDACTED***'
+      
+      # Add static labels for compliance
+      - static_labels:
+          environment: production
+          compliance_framework: eu_ai_act
+          privacy_protection: enabled
+
+  # Application-specific log collection
+  - job_name: rlhf-application
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: rlhf-app
+          service: rlhf-audit-trail
+          __path__: /var/log/rlhf-audit-trail/*.log
+    
+    pipeline_stages:
+      # Parse structured application logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            module: module
+            function: function
+            line: line
+            trace_id: trace_id
+            span_id: span_id
+            session_id: session_id
+            user_id: user_id
+            compliance_check: compliance_check
+            privacy_budget_used: privacy_budget_used
+            audit_event_type: audit_event_type
+            model_checkpoint: model_checkpoint
+      
+      # Convert log level to lowercase
+      - template:
+          source: level
+          template: '{{ ToLower .Value }}'
+      
+      # Set timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Labels for filtering and querying
+      - labels:
+          level:
+          module:
+          service:
+          compliance_check:
+          audit_event_type:
+      
+      # Privacy redaction for application logs
+      - replace:
+          expression: 'annotator_id:\s*"[^"]*"'
+          replace: 'annotator_id: "***ANONYMIZED***"'
+      - replace:
+          expression: 'user_data:\s*{[^}]*}'
+          replace: 'user_data: {***REDACTED***}'
+
+  # Audit log collection (special handling for compliance)
+  - job_name: audit-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: audit-logs
+          service: rlhf-audit-trail
+          log_type: audit
+          __path__: /var/log/rlhf-audit-trail/audit/*.log
+    
+    pipeline_stages:
+      # Parse audit log format
+      - json:
+          expressions:
+            timestamp: timestamp
+            event_id: event_id
+            event_type: event_type
+            session_id: session_id
+            user_id: user_id
+            action: action
+            resource: resource
+            result: result
+            ip_address: ip_address
+            user_agent: user_agent
+            compliance_framework: compliance_framework
+            retention_required: retention_required
+            hash: hash
+            signature: signature
+      
+      # Timestamp parsing
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Essential audit labels
+      - labels:
+          event_type:
+          action:
+          result:
+          compliance_framework:
+          retention_required:
+      
+      # IP address anonymization for privacy
+      - replace:
+          expression: '\b(?:\d{1,3}\.){3}\d{1,3}\b'
+          replace: '***IP-ANONYMIZED***'
+      
+      # Static compliance labels
+      - static_labels:
+          log_category: audit
+          compliance_required: "true"
+          retention_period: "7_years"
+
+  # Privacy-specific log collection
+  - job_name: privacy-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: privacy-logs
+          service: rlhf-audit-trail
+          log_type: privacy
+          __path__: /var/log/rlhf-audit-trail/privacy/*.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            privacy_event: privacy_event
+            epsilon_used: epsilon_used
+            delta_used: delta_used
+            noise_scale: noise_scale
+            anonymization_method: anonymization_method
+            k_anonymity_level: k_anonymity_level
+            data_minimization: data_minimization
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      - labels:
+          privacy_event:
+          anonymization_method:
+          data_minimization:
+      
+      # Convert numeric values to labels for querying
+      - template:
+          source: epsilon_category
+          template: >-
+            {{- if lt (ParseFloat .epsilon_used) 0.1 -}}
+              low
+            {{- else if lt (ParseFloat .epsilon_used) 1.0 -}}
+              medium
+            {{- else -}}
+              high
+            {{- end -}}
+      
+      - labels:
+          epsilon_category:
+      
+      - static_labels:
+          log_category: privacy
+          gdpr_relevant: "true"
+          differential_privacy: "enabled"
+
+  # System logs
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          service: system
+          __path__: /var/log/{messages,syslog,kern.log}
+    
+    pipeline_stages:
+      # Basic syslog parsing
+      - regex:
+          expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s+(?P<message>.*)$'
+      
+      - timestamp:
+          source: timestamp
+          format: Jan 2 15:04:05
+          location: UTC
+      
+      - labels:
+          hostname:
+          service:
+      
+      - static_labels:
+          log_category: system
+
+  # Performance and error logs
+  - job_name: performance-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: performance
+          service: rlhf-audit-trail
+          __path__: /var/log/rlhf-audit-trail/performance/*.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            metric_name: metric_name
+            metric_value: metric_value
+            response_time: response_time
+            cpu_usage: cpu_usage
+            memory_usage: memory_usage
+            error_rate: error_rate
+            endpoint: endpoint
+            status_code: status_code
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # Convert numeric metrics to categories
+      - template:
+          source: performance_category
+          template: >-
+            {{- if gt (ParseFloat .response_time) 1000 -}}
+              slow
+            {{- else if gt (ParseFloat .response_time) 500 -}}
+              moderate
+            {{- else -}}
+              fast
+            {{- end -}}
+      
+      - labels:
+          metric_name:
+          endpoint:
+          status_code:
+          performance_category:
+      
+      - static_labels:
+          log_category: performance
+          monitoring_enabled: "true"
