@@ -1,0 +1,308 @@
+# Terragon Autonomous SDLC - Value Discovery Configuration
+# Repository: rlhf-audit-trail (WORLD-CLASS 95% maturity)
+
+meta:
+  repository_name: "rlhf-audit-trail"
+  repository_type: "ai-ml-compliance"
+  maturity_level: "world-class"
+  maturity_score: 95
+  primary_language: "python"
+  framework: "fastapi-ml-compliance"
+  last_updated: "2025-08-01T00:00:00Z"
+
+# Adaptive scoring weights based on repository maturity level
+scoring:
+  weights:
+    # WORLD-CLASS repositories (95%+ maturity) focus on optimization and innovation
+    world_class:
+      wsjf: 0.45              # Weighted Shortest Job First
+      ice: 0.10               # Impact-Confidence-Ease  
+      technicalDebt: 0.25     # Technical debt reduction priority
+      security: 0.15          # Security/compliance critical for AI/ML
+      innovation: 0.05        # New tech integration opportunities
+    
+    # Fallback weights for other maturity levels
+    advanced:
+      wsjf: 0.5
+      ice: 0.1
+      technicalDebt: 0.3
+      security: 0.1
+    maturing:
+      wsjf: 0.6
+      ice: 0.1
+      technicalDebt: 0.2
+      security: 0.1
+    developing:
+      wsjf: 0.5
+      ice: 0.2
+      technicalDebt: 0.2
+      security: 0.1
+    nascent:
+      wsjf: 0.4
+      ice: 0.3
+      technicalDebt: 0.2
+      security: 0.1
+  
+  # Scoring thresholds and modifiers
+  thresholds:
+    minScore: 15              # Minimum composite score for execution
+    maxRisk: 0.7              # Maximum acceptable risk level
+    securityBoost: 2.5        # AI/ML security critical multiplier
+    complianceBoost: 2.0      # EU AI Act/NIST compliance multiplier
+    performanceBoost: 1.8     # ML performance optimization multiplier
+    innovationBoost: 1.3      # Emerging tech integration multiplier
+
+  # Risk assessment factors
+  risk_factors:
+    high_churn_files: 2.0     # Files with high modification frequency
+    complex_ml_components: 1.8 # RLHF pipeline components
+    compliance_critical: 2.5   # EU AI Act/NIST components
+    security_sensitive: 2.2    # Cryptographic/audit components
+    external_dependencies: 1.4 # Third-party integrations
+
+# Continuous value discovery sources
+discovery:
+  # Code analysis sources
+  sources:
+    gitHistory:
+      enabled: true
+      analysis_depth: "12 months"
+      keywords: ["TODO", "FIXME", "DEPRECATED", "HACK", "XXX", "BUG"]
+      priority_patterns:
+        - "security.*vulnerability"
+        - "compliance.*violation"
+        - "performance.*regression"
+        - "ai.*model.*drift"
+        - "audit.*trail.*integrity"
+    
+    staticAnalysis:
+      enabled: true
+      tools:
+        - name: "ruff"          # Already configured
+          config: "pyproject.toml"
+        - name: "mypy"          # Already configured
+          config: "pyproject.toml"
+        - name: "bandit"        # Security analysis
+          config: "pyproject.toml"
+        - name: "safety"        # Vulnerability scanning
+          config: "requirements.txt"
+        - name: "pytest-cov"    # Coverage analysis
+          config: "pytest.ini"
+    
+    issueTrackers:
+      enabled: true
+      github:
+        api_endpoint: "https://api.github.com/repos/terragonlabs/rlhf-audit-trail"
+        include_labels: ["bug", "enhancement", "security", "compliance", "performance"]
+        priority_labels: ["critical", "high-priority", "security", "compliance"]
+    
+    vulnerabilityDatabases:
+      enabled: true
+      sources:
+        - name: "OSV"
+          endpoint: "https://osv.dev/query"
+        - name: "Trivy"
+          local_scan: true
+        - name: "Safety"
+          command: "safety check"
+        - name: "GitHub Advisory"
+          api: "https://api.github.com/advisories"
+    
+    performanceMonitoring:
+      enabled: true
+      benchmarks:
+        baseline_file: "benchmarks/baseline.json"
+        regression_threshold: 0.05  # 5% performance degradation
+        ml_metrics:
+          - "inference_latency"
+          - "training_throughput"
+          - "memory_usage"
+          - "gpu_utilization"
+    
+    complianceMonitoring:
+      enabled: true
+      frameworks:
+        - name: "EU_AI_Act"
+          validator: "compliance/compliance-validator.py"
+          checklist: "compliance/eu-ai-act-checklist.yml"
+        - name: "NIST_AI"
+          framework: "nist-ai-rmf-1.0"
+        - name: "SLSA"
+          level: 3
+          sbom_required: true
+
+  # ML/AI specific discovery patterns
+  ai_ml_patterns:
+    model_drift:
+      - "model.*performance.*degradation"
+      - "accuracy.*drop"
+      - "bias.*increase"
+      - "fairness.*violation"
+    
+    training_issues:
+      - "rlhf.*convergence"
+      - "reward.*model.*instability"
+      - "annotation.*quality"
+      - "privacy.*budget.*exhaustion"
+    
+    compliance_gaps:
+      - "audit.*trail.*missing"
+      - "provenance.*verification"
+      - "differential.*privacy.*violation"
+      - "consent.*management"
+
+# Task execution configuration
+execution:
+  # Execution constraints
+  constraints:
+    maxConcurrentTasks: 1     # Focus on single high-value task
+    maxExecutionTime: "2 hours"
+    requiresApproval: false   # Autonomous execution enabled
+    
+  # Quality gates
+  quality_gates:
+    testRequirements:
+      minCoverage: 85         # High coverage for AI/ML systems
+      performanceRegression: 3 # Max 3% degradation
+      securityScan: true      # Always required
+      complianceCheck: true   # EU AI Act/NIST validation
+    
+    rollbackTriggers:
+      - testFailure
+      - buildFailure
+      - securityViolation
+      - complianceViolation
+      - performanceRegression
+      - mlModelDrift
+  
+  # Specialized execution strategies for different work types
+  strategies:
+    security_fix:
+      priority_boost: 3.0
+      approval_required: false
+      immediate_execution: true
+      
+    compliance_update:
+      priority_boost: 2.5
+      validation_required: true
+      stakeholder_notification: true
+      
+    performance_optimization:
+      baseline_required: true
+      benchmark_validation: true
+      regression_monitoring: true
+      
+    ml_model_improvement:
+      experiment_tracking: true
+      version_comparison: true
+      bias_validation: true
+
+# Repository-specific value metrics
+value_metrics:
+  # Business impact categories
+  business_value:
+    compliance_score: 40      # Regulatory compliance critical
+    security_posture: 30      # AI/ML security paramount
+    performance: 20           # Training/inference efficiency
+    innovation: 10            # Emerging tech adoption
+  
+  # Technical debt categories
+  technical_debt:
+    ai_ml_debt:
+      model_staleness: 25     # Model/training pipeline updates
+      data_debt: 20           # Data quality/pipeline issues
+      experiment_debt: 15     # Untracked experiments/versions
+      monitoring_gaps: 15     # ML observability holes
+    
+    traditional_debt:
+      code_complexity: 10     # Standard code quality issues
+      documentation: 10       # Missing/outdated docs
+      test_coverage: 5        # Test gaps
+  
+  # Success tracking
+  tracking:
+    cycle_time_target: "4 hours"     # Commit to production
+    mttr_target: "15 minutes"        # Mean time to recovery
+    deployment_frequency: "daily"     # Target deployment cadence
+    change_failure_rate: "< 1%"      # Quality target
+
+# Advanced autonomous features
+autonomous:
+  # Learning and adaptation
+  learning:
+    enabled: true
+    accuracy_tracking: true
+    model_refinement: true
+    pattern_recognition: true
+    
+  # Continuous improvement
+  improvement:
+    scoring_recalibration: "weekly"
+    threshold_adjustment: "monthly"
+    strategy_optimization: "quarterly"
+    
+  # Integration points
+  integrations:
+    github_actions: true
+    monitoring_stack: true    # Prometheus/Grafana
+    compliance_tools: true    # EU AI Act validators
+    ml_platforms: true        # W&B, MLflow integration
+
+# Operational configuration
+operations:
+  # Scheduling
+  schedule:
+    immediate_scan: "on_push"         # Immediate value discovery
+    hourly_security: "0 * * * *"      # Security vulnerability scan
+    daily_analysis: "0 2 * * *"       # Comprehensive analysis
+    weekly_review: "0 3 * * 1"        # Deep SDLC assessment
+    monthly_strategy: "0 4 1 * *"     # Strategic review
+  
+  # Notification and reporting
+  notifications:
+    slack_webhook: "${TERRAGON_SLACK_WEBHOOK}"
+    email_alerts: "${TERRAGON_EMAIL_ALERTS}"
+    github_issues: true
+    
+  # Value tracking and reporting
+  reporting:
+    metrics_file: ".terragon/value-metrics.json"
+    backlog_file: "BACKLOG.md"
+    dashboard_url: "${TERRAGON_DASHBOARD_URL}"
+    weekly_report: true
+
+# Domain-specific configuration for AI/ML compliance
+ai_compliance:
+  # EU AI Act specific
+  eu_ai_act:
+    risk_category: "high-risk"        # RLHF systems are high-risk
+    compliance_deadline: "2026-08-02" # EU AI Act enforcement
+    documentation_requirements:
+      - "model_card"
+      - "risk_assessment"
+      - "audit_trail"
+      - "human_oversight"
+      
+  # NIST AI RMF
+  nist_ai:
+    framework_version: "1.0"
+    risk_tier: "tier_3"              # High impact systems
+    required_assessments:
+      - "bias_evaluation"
+      - "privacy_impact"
+      - "security_assessment"
+      - "reliability_testing"
+
+# Emergency response configuration
+emergency:
+  # Critical vulnerability response
+  security_incident:
+    auto_patch: true                  # Automatic security patching
+    notification_delay: "5 minutes"   # Immediate notification
+    rollback_capability: true        # Automatic rollback on failure
+    
+  # Compliance violation response  
+  compliance_violation:
+    immediate_stop: true              # Stop processing on violation
+    audit_trail_lock: true           # Lock audit records
+    regulator_notification: true     # Notify regulatory bodies

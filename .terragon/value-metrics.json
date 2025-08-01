@@ -1,0 +1,33 @@
+{
+  "total_items_discovered": 15,
+  "items_by_category": {
+    "security": 2,
+    "compliance": 1,
+    "performance": 1,
+    "ai_ml_enhancement": 1,
+    "technical_debt": 9,
+    "maintenance": 1
+  },
+  "discovery_accuracy": 0.0,
+  "total_items_executed": 0,
+  "successful_executions": 0,
+  "failed_executions": 0,
+  "success_rate": 0.0,
+  "average_discovery_time_minutes": 0.0,
+  "average_execution_time_minutes": 0.0,
+  "average_cycle_time_hours": 0.0,
+  "total_value_delivered": 0.0,
+  "technical_debt_reduced": 0.0,
+  "security_improvements": 0,
+  "compliance_improvements": 0,
+  "performance_gains_percent": 0.0,
+  "estimation_accuracy": 0.0,
+  "value_prediction_accuracy": 0.0,
+  "false_positive_rate": 0.0,
+  "learning_iterations": 0,
+  "deployment_frequency_per_day": 0.0,
+  "mttr_minutes": 10.0,
+  "change_failure_rate": 0.0,
+  "last_updated": "2025-08-01T14:30:19.825324",
+  "measurement_period_days": 30
+}
