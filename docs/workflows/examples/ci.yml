@@ -1,0 +1,459 @@
+# RLHF Audit Trail - Continuous Integration Workflow
+# This file should be copied to .github/workflows/ci.yml
+
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.10'
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code quality and security checks
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better relevancy of analysis
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Code formatting check (Black)
+      run: black --check --diff .
+
+    - name: Import sorting check (isort)
+      run: isort --check-only --diff .
+
+    - name: Linting (Ruff)
+      run: ruff check . --output-format=github
+
+    - name: Type checking (mypy)
+      run: mypy src/ --junit-xml=mypy-results.xml
+
+    - name: Security scan (Bandit)
+      run: |
+        bandit -r src/ -f json -o bandit-report.json || true
+        bandit -r src/ -f txt
+
+    - name: Dependency vulnerability scan (Safety)
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check
+
+    - name: License compliance check
+      run: |
+        pip-licenses --format=json --output-file=licenses.json
+        pip-licenses --format=table
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+          licenses.json
+          mypy-results.xml
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      continue-on-error: true
+
+  # Unit and integration tests
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rlhf_audit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run unit tests
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        REDIS_URL: redis://localhost:6379/0
+        TESTING: true
+      run: |
+        pytest tests/unit/ -v --tb=short --cov=src --cov-report=xml --cov-report=html --junit-xml=junit.xml
+
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        REDIS_URL: redis://localhost:6379/0
+        TESTING: true
+      run: |
+        pytest tests/integration/ -v --tb=short --cov=src --cov-report=xml --cov-append --junit-xml=junit-integration.xml
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          junit*.xml
+          htmlcov/
+          coverage.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Compliance and privacy tests
+  compliance:
+    name: Compliance & Privacy Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rlhf_audit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run compliance tests
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        TESTING: true
+      run: |
+        pytest tests/ -m "compliance" -v --tb=short --junit-xml=junit-compliance.xml
+
+    - name: Run privacy tests
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        TESTING: true
+      run: |
+        pytest tests/ -m "privacy" -v --tb=short --junit-xml=junit-privacy.xml
+
+    - name: Run security tests
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        TESTING: true
+      run: |
+        pytest tests/ -m "security" -v --tb=short --junit-xml=junit-security.xml
+
+    - name: EU AI Act compliance check
+      run: |
+        python scripts/compliance-check.py --framework eu_ai_act --output compliance-report.json
+
+    - name: GDPR compliance check
+      run: |
+        python scripts/compliance-check.py --framework gdpr --output gdpr-report.json
+
+    - name: Upload compliance reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: compliance-reports
+        path: |
+          junit-compliance.xml
+          junit-privacy.xml
+          junit-security.xml
+          compliance-report.json
+          gdpr-report.json
+
+  # Documentation build and validation
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e ".[docs]"
+
+    - name: Build documentation
+      run: |
+        cd docs
+        make html
+
+    - name: Check documentation links
+      run: |
+        cd docs
+        make linkcheck
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/_build/html/
+
+  # Container security scanning
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image for scanning
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: ${{ env.IMAGE_NAME }}:scan
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:scan
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Run Trivy vulnerability scanner (JSON)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.IMAGE_NAME }}:scan
+        format: 'json'
+        output: 'trivy-results.json'
+
+    - name: Upload Trivy results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trivy-results
+        path: trivy-results.json
+
+  # Performance benchmarks
+  performance:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: rlhf_audit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run performance benchmarks
+      env:
+        DATABASE_URL: postgresql://postgres:password@localhost:5432/rlhf_audit_test
+        REDIS_URL: redis://localhost:6379/0
+        TESTING: true
+      run: |
+        pytest tests/performance/ -v --benchmark-json=benchmark-results.json
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmark-results.json
+
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'pytest'
+        output-file-path: benchmark-results.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        comment-on-alert: true
+        alert-threshold: '200%'
+        fail-on-alert: true
+
+  # Build status summary
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, compliance, documentation, container-security]
+    if: always()
+
+    steps:
+    - name: Check build status
+      run: |
+        echo "Build Summary:"
+        echo "=============="
+        echo "Code Quality: ${{ needs.code-quality.result }}"
+        echo "Tests: ${{ needs.test.result }}"
+        echo "Compliance: ${{ needs.compliance.result }}"
+        echo "Documentation: ${{ needs.documentation.result }}"
+        echo "Container Security: ${{ needs.container-security.result }}"
+        
+        if [[ "${{ needs.code-quality.result }}" != "success" || \
+              "${{ needs.test.result }}" != "success" || \
+              "${{ needs.compliance.result }}" != "success" || \
+              "${{ needs.documentation.result }}" != "success" ]]; then
+          echo "❌ Build failed - check individual job results"
+          exit 1
+        else
+          echo "✅ All checks passed!"
+        fi
+
+    - name: Post summary to PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const summary = `## 🚀 Build Summary
+          
+          | Check | Status |
+          |-------|--------|
+          | Code Quality | ${{ needs.code-quality.result == 'success' && '✅' || '❌' }} |
+          | Tests | ${{ needs.test.result == 'success' && '✅' || '❌' }} |
+          | Compliance | ${{ needs.compliance.result == 'success' && '✅' || '❌' }} |
+          | Documentation | ${{ needs.documentation.result == 'success' && '✅' || '❌' }} |
+          | Container Security | ${{ needs.container-security.result == 'success' && '✅' || '❌' }} |
+          
+          [View detailed results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });

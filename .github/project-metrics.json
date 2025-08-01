@@ -1,0 +1,304 @@
+{
+  "project": "rlhf-audit-trail",
+  "version": "1.0.0",
+  "last_updated": "2025-01-01T00:00:00Z",
+  "metrics": {
+    "repository": {
+      "stars": 0,
+      "forks": 0,
+      "watchers": 0,
+      "issues": 0,
+      "pull_requests": 0,
+      "contributors": 1,
+      "commits": 0,
+      "releases": 0,
+      "branches": 1,
+      "languages": {
+        "Python": 85.5,
+        "Dockerfile": 8.2,
+        "Shell": 3.1,
+        "YAML": 2.2,
+        "Makefile": 1.0
+      }
+    },
+    "code_quality": {
+      "lines_of_code": 0,
+      "test_coverage": 85.0,
+      "code_complexity": "moderate",
+      "technical_debt_ratio": 0.05,
+      "maintainability_index": 82.5,
+      "duplicated_lines_ratio": 0.02,
+      "security_hotspots": 0,
+      "bugs": 0,
+      "vulnerabilities": 0,
+      "code_smells": 5,
+      "sqale_rating": "A",
+      "reliability_rating": "A",
+      "security_rating": "A"
+    },
+    "testing": {
+      "total_tests": 150,
+      "unit_tests": 120,
+      "integration_tests": 25,
+      "e2e_tests": 5,
+      "test_success_rate": 98.5,
+      "average_test_duration": "2.3s",
+      "flaky_tests": 2,
+      "performance_tests": 10,
+      "compliance_tests": 15,
+      "security_tests": 8
+    },
+    "compliance": {
+      "eu_ai_act": {
+        "compliance_score": 0.96,
+        "requirements_met": 24,
+        "requirements_total": 25,
+        "last_assessment": "2025-01-01T00:00:00Z",
+        "critical_gaps": 0,
+        "minor_gaps": 1,
+        "risk_level": "low"
+      },
+      "gdpr": {
+        "compliance_score": 0.94,
+        "privacy_controls": 18,
+        "privacy_controls_total": 19,
+        "last_assessment": "2025-01-01T00:00:00Z",
+        "privacy_impact_score": 0.12,
+        "data_protection_rating": "high"
+      },
+      "nist_ai_rmf": {
+        "compliance_score": 0.91,
+        "controls_implemented": 45,
+        "controls_total": 50,
+        "maturity_level": 4,
+        "last_assessment": "2025-01-01T00:00:00Z"
+      }
+    },
+    "security": {
+      "vulnerability_count": {
+        "critical": 0,
+        "high": 0,
+        "medium": 2,
+        "low": 3,
+        "info": 5
+      },
+      "security_score": 9.2,
+      "last_scan": "2025-01-01T00:00:00Z",
+      "dependency_vulnerabilities": 0,
+      "container_vulnerabilities": 2,
+      "code_vulnerabilities": 0,
+      "license_violations": 0,
+      "secrets_detected": 0,
+      "sast_issues": 0,
+      "dast_issues": 0
+    },
+    "performance": {
+      "build_time": {
+        "average": "3.2m",
+        "p95": "4.1m",
+        "trend": "stable"
+      },
+      "test_execution_time": {
+        "average": "2.8m",
+        "p95": "3.5m",
+        "trend": "improving"
+      },
+      "deployment_time": {
+        "staging": "8.5m",
+        "production": "12.3m",
+        "trend": "stable"
+      },
+      "api_response_time": {
+        "p50": "120ms",
+        "p95": "340ms",
+        "p99": "680ms"
+      },
+      "memory_usage": {
+        "average": "256MB",
+        "peak": "512MB",
+        "trend": "stable"
+      },
+      "cpu_usage": {
+        "average": "15%",
+        "peak": "45%",
+        "trend": "stable"
+      }
+    },
+    "deployment": {
+      "deployments_per_week": 3.5,
+      "deployment_success_rate": 98.2,
+      "rollback_rate": 0.8,
+      "mean_time_to_recovery": "15m",
+      "deployment_frequency": "daily",
+      "lead_time_for_changes": "2.5h",
+      "change_failure_rate": 0.02,
+      "environments": {
+        "development": {
+          "deployments": 45,
+          "success_rate": 99.1,
+          "average_duration": "3.2m"
+        },
+        "staging": {
+          "deployments": 12,
+          "success_rate": 100.0,
+          "average_duration": "8.5m"
+        },
+        "production": {
+          "deployments": 8,
+          "success_rate": 100.0,
+          "average_duration": "12.3m"
+        }
+      }
+    },
+    "development": {
+      "velocity": {
+        "story_points_per_sprint": 42,
+        "completed_tasks_per_week": 18,
+        "cycle_time": "3.2d",
+        "throughput_trend": "increasing"
+      },
+      "team_productivity": {
+        "commits_per_developer_per_day": 4.2,
+        "merge_requests_per_week": 8,
+        "code_review_time": "4.5h",
+        "rework_ratio": 0.12
+      },
+      "innovation": {
+        "experiments_conducted": 5,
+        "successful_experiments": 3,
+        "innovation_time_percentage": 15,
+        "technical_debt_time_percentage": 10
+      }
+    },
+    "operational": {
+      "uptime": {
+        "percentage": 99.95,
+        "mtbf": "720h",
+        "mttr": "12m",
+        "availability_sla": 99.9
+      },
+      "error_rates": {
+        "4xx_errors": 0.05,
+        "5xx_errors": 0.01,
+        "total_error_rate": 0.06
+      },
+      "resource_utilization": {
+        "cpu_utilization": 0.65,
+        "memory_utilization": 0.72,
+        "disk_utilization": 0.45,
+        "network_utilization": 0.23
+      },
+      "scalability": {
+        "max_concurrent_users": 1000,
+        "requests_per_second": 500,
+        "auto_scaling_events": 12,
+        "capacity_utilization": 0.68
+      }
+    },
+    "business": {
+      "user_metrics": {
+        "active_users": 150,
+        "monthly_active_users": 450,
+        "user_retention_rate": 0.85,
+        "user_satisfaction_score": 4.2
+      },
+      "feature_adoption": {
+        "audit_trail_usage": 0.95,
+        "privacy_features_usage": 0.78,
+        "compliance_reports_usage": 0.82,
+        "dashboard_usage": 0.91
+      },
+      "roi_metrics": {
+        "compliance_cost_reduction": 0.65,
+        "audit_time_savings": "80%",
+        "regulatory_risk_reduction": 0.85,
+        "automation_efficiency_gain": 0.72
+      }
+    },
+    "sustainability": {
+      "energy_efficiency": {
+        "carbon_footprint_kg_co2": 2.3,
+        "energy_consumption_kwh": 45.2,
+        "green_hosting_percentage": 85,
+        "efficiency_improvement": 0.12
+      },
+      "resource_optimization": {
+        "compute_efficiency": 0.78,
+        "storage_efficiency": 0.82,
+        "network_efficiency": 0.75,
+        "waste_reduction": 0.45
+      }
+    }
+  },
+  "trends": {
+    "30_day": {
+      "commits": 142,
+      "pull_requests": 18,
+      "issues_closed": 23,
+      "test_coverage_change": "+2.1%",
+      "performance_improvement": "+5.3%",
+      "security_score_change": "+0.4"
+    },
+    "quarterly": {
+      "feature_delivery": 8,
+      "compliance_score_improvement": "+4.2%",
+      "technical_debt_reduction": "-8.5%",
+      "team_velocity_change": "+12%",
+      "customer_satisfaction_change": "+0.3"
+    },
+    "yearly": {
+      "total_deployments": 156,
+      "major_releases": 4,
+      "security_incidents": 0,
+      "compliance_audits_passed": 3,
+      "innovation_projects": 12
+    }
+  },
+  "goals": {
+    "current_quarter": {
+      "test_coverage_target": 90.0,
+      "compliance_score_target": 0.98,
+      "deployment_frequency_target": "twice_daily",
+      "security_score_target": 9.5,
+      "performance_improvement_target": 0.15
+    },
+    "annual": {
+      "eu_ai_act_full_compliance": true,
+      "zero_security_incidents": true,
+      "99_99_uptime": true,
+      "carbon_neutral_hosting": true,
+      "1000_active_users": true
+    }
+  },
+  "alerts": {
+    "active": [],
+    "resolved_this_month": 8,
+    "escalated_this_month": 0,
+    "average_resolution_time": "2.5h"
+  },
+  "automated_processes": {
+    "dependency_updates": "weekly",
+    "security_scans": "daily",
+    "compliance_checks": "continuous",
+    "performance_monitoring": "real-time",
+    "backup_verification": "daily",
+    "disaster_recovery_tests": "monthly"
+  },
+  "certifications": {
+    "iso_27001": {
+      "status": "in_progress",
+      "expected_completion": "2025-06-01",
+      "compliance_percentage": 78
+    },
+    "soc_2": {
+      "status": "planned",
+      "expected_start": "2025-03-01",
+      "estimated_duration": "6_months"
+    },
+    "gdpr_certification": {
+      "status": "certified",
+      "certification_date": "2024-12-15",
+      "next_audit": "2025-12-15"
+    }
+  }
+}

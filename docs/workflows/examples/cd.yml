@@ -1,0 +1,469 @@
+# RLHF Audit Trail - Continuous Deployment Workflow
+# This file should be copied to .github/workflows/cd.yml
+
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      force_deploy:
+        description: 'Force deployment (skip some checks)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  # Determine deployment environment and configuration
+  setup:
+    name: Deployment Setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.config.outputs.environment }}
+      image_tag: ${{ steps.config.outputs.image_tag }}
+      deploy_to_staging: ${{ steps.config.outputs.deploy_to_staging }}
+      deploy_to_production: ${{ steps.config.outputs.deploy_to_production }}
+      
+    steps:
+    - name: Determine deployment configuration
+      id: config
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "image_tag=latest" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/tags/v"* ]]; then
+          echo "environment=production" >> $GITHUB_OUTPUT
+          echo "image_tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "environment=staging" >> $GITHUB_OUTPUT
+          echo "image_tag=latest" >> $GITHUB_OUTPUT
+        fi
+        
+        if [[ "${{ steps.config.outputs.environment }}" == "staging" ]]; then
+          echo "deploy_to_staging=true" >> $GITHUB_OUTPUT
+          echo "deploy_to_production=false" >> $GITHUB_OUTPUT
+        elif [[ "${{ steps.config.outputs.environment }}" == "production" ]]; then
+          echo "deploy_to_staging=false" >> $GITHUB_OUTPUT
+          echo "deploy_to_production=true" >> $GITHUB_OUTPUT
+        fi
+
+  # Build and push Docker images
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: setup
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+          VERSION=${{ needs.setup.outputs.image_tag }}
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.setup.outputs.image_tag }}
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  # Deploy to staging environment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push]
+    if: needs.setup.outputs.deploy_to_staging == 'true'
+    environment:
+      name: staging
+      url: https://staging.rlhf-audit-trail.example.com
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl for staging
+      run: |
+        echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+        kubectl config view --minify
+
+    - name: Deploy to staging Kubernetes
+      env:
+        KUBECONFIG: kubeconfig
+        IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
+      run: |
+        # Update image tag in Kubernetes manifests
+        sed -i "s|image: ghcr.io/.*:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}|g" deploy/kubernetes/staging/*.yaml
+        
+        # Apply manifests
+        kubectl apply -f deploy/kubernetes/staging/
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/rlhf-audit-trail -n staging --timeout=300s
+
+    - name: Run staging smoke tests
+      run: |
+        # Wait for services to be ready
+        sleep 30
+        
+        # Run basic smoke tests
+        curl -f https://staging.rlhf-audit-trail.example.com/health || exit 1
+        curl -f https://staging.rlhf-audit-trail.example.com/api/v1/status || exit 1
+
+    - name: Run staging integration tests
+      env:
+        STAGING_API_URL: https://staging.rlhf-audit-trail.example.com
+        STAGING_API_KEY: ${{ secrets.STAGING_API_KEY }}
+      run: |
+        python -m pytest tests/integration/ --staging --api-url=${STAGING_API_URL} --api-key=${STAGING_API_KEY}
+
+    - name: Notify deployment success
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#deployments'
+        text: '🚀 RLHF Audit Trail deployed to staging successfully!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify deployment failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#deployments'
+        text: '❌ RLHF Audit Trail staging deployment failed!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Production deployment approval and execution
+  production-approval:
+    name: Production Deployment Approval
+    runs-on: ubuntu-latest
+    needs: [setup]
+    if: needs.setup.outputs.deploy_to_production == 'true'
+    environment:
+      name: production-approval
+    
+    steps:
+    - name: Request production deployment approval
+      run: |
+        echo "Production deployment requested for version ${{ needs.setup.outputs.image_tag }}"
+        echo "Please review and approve this deployment."
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [setup, build-and-push, production-approval]
+    if: needs.setup.outputs.deploy_to_production == 'true'
+    environment:
+      name: production
+      url: https://rlhf-audit-trail.example.com
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl for production
+      run: |
+        echo "${{ secrets.PRODUCTION_KUBECONFIG }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+        kubectl config view --minify
+
+    - name: Pre-deployment backup
+      env:
+        KUBECONFIG: kubeconfig
+      run: |
+        # Create database backup
+        kubectl exec -n production deployment/postgres -- pg_dump -U postgres rlhf_audit > backup-$(date +%Y%m%d-%H%M%S).sql
+        
+        # Upload backup to storage
+        aws s3 cp backup-*.sql s3://rlhf-backups/production/
+
+    - name: Blue-Green deployment setup
+      env:
+        KUBECONFIG: kubeconfig
+        IMAGE_TAG: ${{ needs.setup.outputs.image_tag }}
+      run: |
+        # Create new deployment with green label
+        sed -i "s|image: ghcr.io/.*:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}|g" deploy/kubernetes/production/*.yaml
+        sed -i "s|app: rlhf-audit-trail|app: rlhf-audit-trail-green|g" deploy/kubernetes/production/deployment.yaml
+        
+        # Deploy green version
+        kubectl apply -f deploy/kubernetes/production/
+        
+        # Wait for green deployment to be ready
+        kubectl rollout status deployment/rlhf-audit-trail-green -n production --timeout=600s
+
+    - name: Production smoke tests
+      env:
+        KUBECONFIG: kubeconfig
+      run: |
+        # Get green service endpoint
+        GREEN_ENDPOINT=$(kubectl get svc rlhf-audit-trail-green -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        # Run smoke tests against green deployment
+        curl -f http://${GREEN_ENDPOINT}:8000/health || exit 1
+        curl -f http://${GREEN_ENDPOINT}:8000/api/v1/status || exit 1
+
+    - name: Switch traffic to green deployment
+      env:
+        KUBECONFIG: kubeconfig
+      run: |
+        # Update service selector to point to green deployment
+        kubectl patch service rlhf-audit-trail -n production -p '{"spec":{"selector":{"app":"rlhf-audit-trail-green"}}}'
+        
+        # Wait for traffic switch
+        sleep 30
+
+    - name: Production integration tests
+      env:
+        PRODUCTION_API_URL: https://rlhf-audit-trail.example.com
+        PRODUCTION_API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+      run: |
+        python -m pytest tests/integration/ --production --api-url=${PRODUCTION_API_URL} --api-key=${PRODUCTION_API_KEY}
+
+    - name: Cleanup old deployment
+      env:
+        KUBECONFIG: kubeconfig
+      run: |
+        # Remove old blue deployment
+        kubectl delete deployment rlhf-audit-trail -n production --ignore-not-found=true
+        
+        # Rename green deployment to standard name
+        kubectl patch deployment rlhf-audit-trail-green -n production -p '{"metadata":{"name":"rlhf-audit-trail"},"spec":{"selector":{"matchLabels":{"app":"rlhf-audit-trail"}},"template":{"metadata":{"labels":{"app":"rlhf-audit-trail"}}}}}'
+
+    - name: Update deployment tracking
+      run: |
+        # Record deployment in tracking system
+        curl -X POST https://deployment-tracker.example.com/api/deployments \
+          -H "Authorization: Bearer ${{ secrets.DEPLOYMENT_TRACKER_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "service": "rlhf-audit-trail",
+            "version": "${{ needs.setup.outputs.image_tag }}",
+            "environment": "production",
+            "deployed_by": "${{ github.actor }}",
+            "deployment_time": "${{ steps.timestamp.outputs.timestamp }}",
+            "commit_sha": "${{ github.sha }}"
+          }'
+
+    - name: Generate deployment report
+      run: |
+        cat > deployment-report.md << EOF
+        # Production Deployment Report
+        
+        **Service:** RLHF Audit Trail
+        **Version:** ${{ needs.setup.outputs.image_tag }}
+        **Environment:** Production
+        **Deployed by:** ${{ github.actor }}
+        **Deployment time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Commit:** ${{ github.sha }}
+        
+        ## Deployment Summary
+        - ✅ Image built and pushed successfully
+        - ✅ Security scan completed
+        - ✅ Blue-green deployment executed
+        - ✅ Smoke tests passed
+        - ✅ Integration tests passed
+        - ✅ Traffic switched successfully
+        - ✅ Old deployment cleaned up
+        
+        ## Compliance Notes
+        - All regulatory requirements maintained
+        - Audit trail integrity preserved
+        - Privacy protection mechanisms active
+        - Monitoring and alerting operational
+        
+        ## Rollback Procedure
+        If issues are detected, rollback using:
+        \`\`\`bash
+        kubectl rollout undo deployment/rlhf-audit-trail -n production
+        \`\`\`
+        EOF
+
+    - name: Upload deployment report
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-report
+        path: deployment-report.md
+
+    - name: Notify successful deployment
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#deployments'
+        text: |
+          🎉 RLHF Audit Trail v${{ needs.setup.outputs.image_tag }} deployed to production successfully!
+          
+          Deployed by: ${{ github.actor }}
+          Commit: ${{ github.sha }}
+          Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify deployment failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#deployments'
+        text: |
+          🚨 RLHF Audit Trail production deployment FAILED!
+          
+          Version: ${{ needs.setup.outputs.image_tag }}
+          Deployed by: ${{ github.actor }}
+          Check the logs immediately and initiate rollback if necessary.
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Post-deployment monitoring and validation
+  post-deployment:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [setup, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+    - name: Wait for service stabilization
+      run: sleep 120
+
+    - name: Validate deployment health
+      env:
+        ENVIRONMENT: ${{ needs.setup.outputs.environment }}
+      run: |
+        if [[ "$ENVIRONMENT" == "staging" ]]; then
+          BASE_URL="https://staging.rlhf-audit-trail.example.com"
+        else
+          BASE_URL="https://rlhf-audit-trail.example.com"
+        fi
+        
+        # Health checks
+        curl -f ${BASE_URL}/health
+        curl -f ${BASE_URL}/metrics
+        curl -f ${BASE_URL}/api/v1/status
+        
+        # Compliance endpoint check
+        curl -f ${BASE_URL}/compliance/status
+
+    - name: Monitor key metrics
+      run: |
+        # Query Prometheus for key metrics
+        PROMETHEUS_URL="https://prometheus.rlhf-audit-trail.example.com"
+        
+        # Check error rate
+        ERROR_RATE=$(curl -s "${PROMETHEUS_URL}/api/v1/query?query=rate(http_requests_total{status=~'5..'}[5m])" | jq -r '.data.result[0].value[1] // 0')
+        echo "Error rate: ${ERROR_RATE}"
+        
+        # Check response time
+        RESPONSE_TIME=$(curl -s "${PROMETHEUS_URL}/api/v1/query?query=histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))" | jq -r '.data.result[0].value[1] // 0')
+        echo "95th percentile response time: ${RESPONSE_TIME}s"
+        
+        # Alert if metrics are concerning
+        if (( $(echo "$ERROR_RATE > 0.01" | bc -l) )); then
+          echo "⚠️ High error rate detected: ${ERROR_RATE}"
+          exit 1
+        fi
+        
+        if (( $(echo "$RESPONSE_TIME > 1.0" | bc -l) )); then
+          echo "⚠️ High response time detected: ${RESPONSE_TIME}s"
+          exit 1
+        fi
+
+    - name: Update status page
+      if: needs.setup.outputs.deploy_to_production == 'true'
+      run: |
+        # Update status page with deployment information
+        curl -X POST https://status.rlhf-audit-trail.example.com/api/incidents \
+          -H "Authorization: Bearer ${{ secrets.STATUS_PAGE_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "name": "Scheduled Deployment",
+            "status": "resolved",
+            "message": "RLHF Audit Trail v${{ needs.setup.outputs.image_tag }} deployed successfully",
+            "components": ["api", "dashboard", "compliance-engine"]
+          }'
