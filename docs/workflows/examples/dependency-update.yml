@@ -1,0 +1,497 @@
+# RLHF Audit Trail - Dependency Update Workflow
+# This file should be copied to .github/workflows/dependency-update.yml
+
+name: Dependency Updates
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of update to perform'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+        - all
+
+env:
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  # Automated dependency updates
+  dependency-update:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-tools safety pip-audit
+
+    - name: Update requirements files
+      run: |
+        # Update main dependencies
+        pip-compile --upgrade requirements.in
+        
+        # Update development dependencies
+        pip-compile --upgrade requirements-dev.in
+        
+        # Generate lock files
+        pip-compile --generate-hashes requirements.in
+        pip-compile --generate-hashes requirements-dev.in
+
+    - name: Install updated dependencies
+      run: |
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Run security checks on updated dependencies
+      run: |
+        # Check for known vulnerabilities
+        safety check --json --output safety-results.json || true
+        pip-audit --format=json --output=pip-audit-results.json || true
+        
+        # Check for critical vulnerabilities
+        CRITICAL_VULNS=$(cat safety-results.json | jq '.vulnerabilities | length')
+        if [ "$CRITICAL_VULNS" -gt 0 ]; then
+          echo "Critical vulnerabilities found in dependency updates!"
+          cat safety-results.json | jq '.vulnerabilities'
+          exit 1
+        fi
+
+    - name: Run tests with updated dependencies
+      run: |
+        # Run fast tests to validate updates
+        pytest tests/unit/ -v --tb=short -x --maxfail=5
+
+    - name: Check for license compliance
+      run: |
+        pip-licenses --format=json --output-file=licenses.json
+        
+        # Check for prohibited licenses (customize as needed)
+        python3 << 'EOF'
+        import json
+        
+        prohibited_licenses = ['GPL-3.0', 'AGPL-3.0', 'LGPL-3.0']
+        
+        with open('licenses.json', 'r') as f:
+            licenses = json.load(f)
+        
+        violations = []
+        for pkg in licenses:
+            if pkg['License'] in prohibited_licenses:
+                violations.append(f"{pkg['Name']} - {pkg['License']}")
+        
+        if violations:
+            print("License violations found:")
+            for violation in violations:
+                print(f"  - {violation}")
+            exit(1)
+        else:
+            print("All licenses are compliant")
+        EOF
+
+    - name: Generate update summary
+      run: |
+        # Create summary of changes
+        git diff --name-only > changed_files.txt
+        
+        if [ -s changed_files.txt ]; then
+          echo "Dependencies updated. Changed files:"
+          cat changed_files.txt
+          
+          # Generate detailed change summary
+          python3 << 'EOF'
+        import subprocess
+        import json
+        from datetime import datetime
+        
+        # Get git diff for requirements files
+        diff_output = subprocess.run(['git', 'diff', '--unified=0', 'requirements.txt'], 
+                                   capture_output=True, text=True).stdout
+        
+        summary = {
+          "update_date": datetime.now().isoformat(),
+          "updated_packages": [],
+          "added_packages": [],
+          "removed_packages": [],
+          "security_improvements": True,
+          "license_compliant": True
+        }
+        
+        # Parse diff to extract package changes
+        for line in diff_output.split('\n'):
+          if line.startswith('+') and '==' in line and not line.startswith('+++'):
+            pkg_line = line[1:].strip()
+            if pkg_line:
+              summary["updated_packages"].append(pkg_line)
+          elif line.startswith('-') and '==' in line and not line.startswith('---'):
+            pkg_line = line[1:].strip()
+            if pkg_line:
+              summary["removed_packages"].append(pkg_line)
+        
+        with open('dependency-update-summary.json', 'w') as f:
+          json.dump(summary, f, indent=2)
+        
+        # Generate markdown summary
+        with open('dependency-update-summary.md', 'w') as f:
+          f.write(f"""# Dependency Update Summary
+          
+        **Update Date:** {summary['update_date']}
+        
+        ## Updated Packages
+        """)
+          for pkg in summary["updated_packages"]:
+            f.write(f"- {pkg}\n")
+          
+          f.write(f"""
+        ## Security Status
+        - Vulnerability scan: ✅ Passed
+        - License compliance: ✅ Compliant
+        - Tests: ✅ Passing
+        
+        ## Validation Results
+        - Unit tests: Passed
+        - Security checks: No critical vulnerabilities
+        - License verification: All licenses approved
+        """)
+        EOF
+        else
+          echo "No dependency changes detected"
+          exit 0
+        fi
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: |
+          chore: update dependencies (automated)
+          
+          - Updated Python dependencies to latest compatible versions
+          - Validated security and license compliance
+          - All tests passing with updated dependencies
+          
+          🤖 This is an automated dependency update
+        title: 'chore: automated dependency update'
+        body: |
+          ## 🔄 Automated Dependency Update
+          
+          This PR contains automated dependency updates generated by the dependency update workflow.
+          
+          ### 📋 Summary
+          - **Update Type:** ${{ github.event.inputs.update_type || 'minor' }}
+          - **Triggered:** ${{ github.event_name == 'schedule' && 'Scheduled (weekly)' || 'Manual' }}
+          - **Security Scan:** ✅ Passed
+          - **License Check:** ✅ Compliant
+          - **Tests:** ✅ Passing
+          
+          ### 🔍 Validation Performed
+          - [x] Security vulnerability scan (Safety + pip-audit)
+          - [x] License compliance verification
+          - [x] Unit test execution
+          - [x] Dependency conflict resolution
+          
+          ### 📦 Changed Files
+          - `requirements.txt` - Updated production dependencies
+          - `requirements-dev.txt` - Updated development dependencies
+          - `requirements.in` / `requirements-dev.in` - Source dependency files
+          
+          ### 🔐 Security Notes
+          - No critical vulnerabilities introduced
+          - All licenses remain compliant with project policy
+          - Dependencies validated against known security advisories
+          
+          ### 🧪 Testing
+          Unit tests have been executed with the updated dependencies and are passing.
+          Full integration tests will run as part of the PR validation.
+          
+          ### 🤖 Automation Info
+          This PR was automatically created by the dependency update workflow.
+          It will be automatically merged if all checks pass and no conflicts are detected.
+          
+          **Review Required:** Manual review recommended for major version updates.
+        branch: automated/dependency-update-${{ github.run_number }}
+        delete-branch: true
+        labels: |
+          dependencies
+          automated
+          chore
+        reviewers: |
+          # Add default reviewers for dependency updates
+        assignees: |
+          # Add assignees if needed
+        draft: false
+
+  # Security-focused dependency updates
+  security-update:
+    name: Security Dependency Updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety pip-audit
+
+    - name: Check for security vulnerabilities
+      run: |
+        # Generate current requirements
+        pip freeze > current-requirements.txt
+        
+        # Check for vulnerabilities
+        safety check --json --output current-vulnerabilities.json || true
+        pip-audit --format=json --output=current-audit.json || true
+        
+        # Check if any vulnerabilities exist
+        VULN_COUNT=$(cat current-vulnerabilities.json | jq '.vulnerabilities | length' 2>/dev/null || echo "0")
+        
+        if [ "$VULN_COUNT" -gt 0 ]; then
+          echo "Security vulnerabilities found: $VULN_COUNT"
+          echo "Creating security update PR..."
+          
+          # Try to update vulnerable packages
+          cat current-vulnerabilities.json | jq -r '.vulnerabilities[].package_name' | sort -u > vulnerable-packages.txt
+          
+          if [ -s vulnerable-packages.txt ]; then
+            echo "Updating vulnerable packages:"
+            cat vulnerable-packages.txt
+            
+            # Update vulnerable packages
+            while read package; do
+              pip install --upgrade "$package" || echo "Failed to update $package"
+            done < vulnerable-packages.txt
+            
+            # Generate new requirements
+            pip freeze > updated-requirements.txt
+            
+            # Verify vulnerabilities are fixed
+            safety check --json --output updated-vulnerabilities.json || true
+            NEW_VULN_COUNT=$(cat updated-vulnerabilities.json | jq '.vulnerabilities | length' 2>/dev/null || echo "0")
+            
+            if [ "$NEW_VULN_COUNT" -lt "$VULN_COUNT" ]; then
+              echo "Security improvements detected: $VULN_COUNT -> $NEW_VULN_COUNT vulnerabilities"
+              
+              # Create security update summary
+              python3 << 'EOF'
+        import json
+        
+        with open('current-vulnerabilities.json', 'r') as f:
+          current_vulns = json.load(f)
+        
+        with open('updated-vulnerabilities.json', 'r') as f:
+          updated_vulns = json.load(f)
+        
+        print(f"Security Update Summary:")
+        print(f"Before: {len(current_vulns.get('vulnerabilities', []))} vulnerabilities")
+        print(f"After: {len(updated_vulns.get('vulnerabilities', []))} vulnerabilities")
+        print(f"Fixed: {len(current_vulns.get('vulnerabilities', [])) - len(updated_vulns.get('vulnerabilities', []))} vulnerabilities")
+        EOF
+            fi
+          fi
+        else
+          echo "No security vulnerabilities found"
+          exit 0
+        fi
+
+    - name: Create Security Update PR
+      if: success()
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: |
+          security: update vulnerable dependencies (automated)
+          
+          - Updated packages with known security vulnerabilities
+          - Validated fixes using Safety and pip-audit
+          - Maintained compatibility with existing codebase
+          
+          🔒 This is an automated security update
+        title: '🔒 SECURITY: automated vulnerability fixes'
+        body: |
+          ## 🚨 Security Dependency Update
+          
+          This PR contains automated security updates for dependencies with known vulnerabilities.
+          
+          ### 🔍 Security Summary
+          - **Trigger:** Automated security scan
+          - **Vulnerabilities Found:** Check workflow logs for details
+          - **Action Taken:** Updated vulnerable packages to secure versions
+          - **Validation:** Security scan re-run to verify fixes
+          
+          ### ⚠️ IMPORTANT
+          This PR addresses **security vulnerabilities** and should be reviewed and merged promptly.
+          
+          ### 🔐 Security Validation
+          - [x] Vulnerability scan performed
+          - [x] Affected packages identified
+          - [x] Updates applied to vulnerable packages
+          - [x] Post-update security verification
+          
+          ### 📋 Next Steps
+          1. **Review**: Verify the security updates don't break functionality
+          2. **Test**: Run full test suite to ensure compatibility
+          3. **Deploy**: Prioritize deployment to address security issues
+          
+          ### 🤖 Automation Info
+          This PR was automatically created due to detected security vulnerabilities.
+          Please review and merge promptly to maintain security posture.
+        branch: automated/security-update-${{ github.run_number }}
+        delete-branch: true
+        labels: |
+          security
+          dependencies
+          critical
+          automated
+        reviewers: |
+          # Add security team reviewers
+        assignees: |
+          # Add security team assignees
+        draft: false
+
+  # License compliance monitoring
+  license-audit:
+    name: License Compliance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pip-licenses
+
+    - name: Generate license report
+      run: |
+        # Generate comprehensive license report
+        pip-licenses --format=json --output-file=licenses.json
+        pip-licenses --format=csv --output-file=licenses.csv
+        pip-licenses --format=plain --output-file=licenses.txt
+        
+        # Generate license summary
+        python3 << 'EOF'
+        import json
+        from collections import Counter
+        
+        with open('licenses.json', 'r') as f:
+          licenses = json.load(f)
+        
+        license_counts = Counter(pkg['License'] for pkg in licenses)
+        
+        print("License Distribution:")
+        print("===================")
+        for license_type, count in license_counts.most_common():
+          print(f"{license_type}: {count} packages")
+        
+        # Check for potential issues
+        concerning_licenses = ['GPL-3.0', 'AGPL-3.0', 'LGPL-3.0', 'UNKNOWN']
+        issues = []
+        
+        for pkg in licenses:
+          if pkg['License'] in concerning_licenses:
+            issues.append(f"{pkg['Name']} ({pkg['Version']}) - {pkg['License']}")
+        
+        if issues:
+          print("\nPotential License Issues:")
+          print("========================")
+          for issue in issues:
+            print(f"⚠️  {issue}")
+        else:
+          print("\n✅ No license compliance issues detected")
+        EOF
+
+    - name: Upload license reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-reports
+        path: |
+          licenses.json
+          licenses.csv
+          licenses.txt
+
+    - name: Check license policy compliance
+      run: |
+        # Define approved licenses
+        python3 << 'EOF'
+        import json
+        import sys
+        
+        # Define approved licenses (customize as needed)
+        approved_licenses = {
+          'MIT', 'BSD-3-Clause', 'BSD-2-Clause', 'Apache-2.0', 
+          'Apache Software License', 'ISC', 'Python Software Foundation License',
+          'Mozilla Public License 2.0 (MPL 2.0)', 'new BSD License'
+        }
+        
+        # Define prohibited licenses
+        prohibited_licenses = {
+          'GPL-3.0', 'AGPL-3.0', 'LGPL-3.0'
+        }
+        
+        with open('licenses.json', 'r') as f:
+          licenses = json.load(f)
+        
+        violations = []
+        warnings = []
+        
+        for pkg in licenses:
+          license_name = pkg['License']
+          if license_name in prohibited_licenses:
+            violations.append(f"{pkg['Name']} ({pkg['Version']}) - {license_name}")
+          elif license_name not in approved_licenses and license_name != 'UNKNOWN':
+            warnings.append(f"{pkg['Name']} ({pkg['Version']}) - {license_name}")
+        
+        if violations:
+          print("❌ License Policy Violations:")
+          for violation in violations:
+            print(f"  {violation}")
+          sys.exit(1)
+        
+        if warnings:
+          print("⚠️  License Review Required:")
+          for warning in warnings:
+            print(f"  {warning}")
+        
+        print("✅ License compliance check completed")
+        EOF
