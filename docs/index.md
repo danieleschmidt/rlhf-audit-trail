@@ -27,11 +27,16 @@ Welcome to the comprehensive documentation for the RLHF Audit Trail project - yo
 - [Privacy Analysis](compliance/privacy-analysis.md)
 - [Audit Best Practices](compliance/best-practices.md)
 
-### Development
+### Development & Operations
 - [Contributing Guidelines](../CONTRIBUTING.md)
 - [Security Policy](../SECURITY.md)
-- [Architecture Overview](development/architecture.md)
-- [Testing Guide](development/testing.md)
+- [Architecture Overview](ARCHITECTURE.md)
+- [Testing Guide](../tests/docs/testing_guide.md)
+- [**SDLC Implementation Guide**](SDLC_IMPLEMENTATION_GUIDE.md) ⭐
+- [**SDLC Checkpoint Strategy**](SDLC_CHECKPOINT_STRATEGY.md) 🚀
+- [Development Environment](DEVELOPMENT.md)
+- [Deployment Guide](deployment/)
+- [Monitoring & Observability](../monitoring/docs/)
 
 ## Project Overview
 
