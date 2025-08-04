@@ -51,7 +51,7 @@ merkletools>=1.0.3
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/rlhf-audit-trail.git
+git clone https://github.com/danieleschmidt/rlhf-audit-trail.git
 cd rlhf-audit-trail
 
 # Create virtual environment
@@ -305,9 +305,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ```bibtex
 @software{rlhf_audit_trail,
   title = {RLHF Audit Trail: Verifiable Provenance for Human Feedback Learning},
-  author = {Your Organization},
+  author = {Daniel Schmidt},
   year = {2025},
-  url = {https://github.com/yourusername/rlhf-audit-trail}
+  url = {https://github.com/danieleschmidt/rlhf-audit-trail}
 }
 ```
 
