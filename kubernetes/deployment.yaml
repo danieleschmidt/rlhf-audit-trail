@@ -1,0 +1,212 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantum-task-planner
+  labels:
+    app: quantum-task-planner
+    version: v1
+    component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: quantum-task-planner
+  template:
+    metadata:
+      labels:
+        app: quantum-task-planner
+        version: v1
+    spec:
+      serviceAccountName: quantum-task-planner
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: quantum-planner
+        image: quantum-task-planner:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: QUANTUM_PLANNER_ENV
+          value: "production"
+        - name: QUANTUM_PLANNER_LOG_LEVEL
+          value: "INFO"
+        - name: QUANTUM_PLANNER_API_HOST
+          value: "0.0.0.0"
+        - name: QUANTUM_PLANNER_API_PORT
+          value: "8000"
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantum-secrets
+              key: redis-url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantum-secrets
+              key: database-url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantum-secrets
+              key: secret-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: quantum-data
+          mountPath: /app/data
+        - name: quantum-logs
+          mountPath: /app/logs
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: quantum-data
+        persistentVolumeClaim:
+          claimName: quantum-data-pvc
+      - name: quantum-logs
+        persistentVolumeClaim:
+          claimName: quantum-logs-pvc
+      - name: config-volume
+        configMap:
+          name: quantum-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantum-task-planner-service
+  labels:
+    app: quantum-task-planner
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: quantum-task-planner
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quantum-task-planner
+  labels:
+    app: quantum-task-planner
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quantum-task-planner-ingress
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  tls:
+  - hosts:
+    - quantum-planner.yourdomain.com
+    secretName: quantum-planner-tls
+  rules:
+  - host: quantum-planner.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: quantum-task-planner-service
+            port:
+              number: 8000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quantum-data-pvc
+  labels:
+    app: quantum-task-planner
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quantum-logs-pvc
+  labels:
+    app: quantum-task-planner
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantum-config
+  labels:
+    app: quantum-task-planner
+data:
+  config.yaml: |
+    quantum_planner:
+      coherence_preservation: true
+      entanglement_enabled: true
+      interference_threshold: 0.3
+      
+      performance:
+        enable_caching: true
+        cache_size: 1000
+        max_worker_threads: 4
+        batch_size: 10
+        enable_parallel_scheduling: true
+        auto_scaling_enabled: true
+        
+      security:
+        max_concurrent_tasks: 100
+        max_total_tasks: 10000
+        rate_limiting:
+          max_tasks_per_minute: 1000
+          max_tasks_per_hour: 10000
+        
+      monitoring:
+        metrics_enabled: true
+        health_checks_enabled: true
+        log_level: INFO
+        
+      integration:
+        enable_rest_api: true
+        enable_webhooks: false
+        enable_message_queue: true
+        queue_type: redis
