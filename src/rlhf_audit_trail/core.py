@@ -24,7 +24,8 @@ from .audit import AuditLogger, TrainingEvent, EventType
 from .privacy import DifferentialPrivacyEngine, PrivacyBudgetManager
 from .compliance import ComplianceValidator, ComplianceFramework
 from .crypto import CryptographicEngine, IntegrityVerifier
-from .storage import StorageBackend, LocalStorage, S3Storage
+from .storage import StorageBackend, LocalStorage, S3Storage, create_storage_backend
+from .integrations import IntegrationManager
 
 
 class TrainingPhase(Enum):
@@ -150,6 +151,7 @@ class AuditableRLHF:
         self._setup_privacy()
         self._setup_audit()
         self._setup_compliance()
+        self._setup_integrations()
         
         # Training session state
         self.current_session: Optional[TrainingSession] = None
@@ -172,21 +174,16 @@ class AuditableRLHF:
     
     def _setup_storage(self, backend: str, config: Dict[str, Any]):
         """Setup storage backend."""
-        if backend == "local":
-            self.storage = LocalStorage(config.get("base_path", "./audit_data"))
-        elif backend == "s3":
-            self.storage = S3Storage(
-                bucket=config.get("bucket", "rlhf-audit-trail"),
-                region=config.get("region", "us-east-1"),
-                access_key=config.get("access_key"),
-                secret_key=config.get("secret_key")
-            )
-        else:
-            raise ValueError(f"Unsupported storage backend: {backend}")
+        try:
+            self.storage = create_storage_backend(backend, **config)
+        except Exception as e:
+            self.logger.warning(f"Failed to create {backend} storage backend: {e}")
+            self.logger.info("Falling back to local storage")
+            self.storage = LocalStorage(base_path=config.get("base_path", "./audit_data"))
     
     def _setup_crypto(self):
         """Setup cryptographic components."""
-        self.crypto = CryptographicEngine(self.security_config)
+        self.crypto = CryptographicEngine()
         self.verifier = IntegrityVerifier(self.crypto)
     
     def _setup_privacy(self):
@@ -217,6 +214,10 @@ class AuditableRLHF:
             frameworks=frameworks,
             config=self.compliance_config
         )
+    
+    def _setup_integrations(self):
+        """Setup ML library integrations."""
+        self.integration_manager = IntegrationManager(self)
     
     @asynccontextmanager
     async def track_training(self, experiment_name: str) -> AsyncIterator[TrainingSession]:
