@@ -16,7 +16,21 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union, Callable, AsyncIterator
 import logging
 import hashlib
-import numpy as np
+
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    # Mock numpy for basic functionality
+    class MockNumpy:
+        def random(self):
+            import random
+            class MockRandom:
+                def uniform(self, low, high):
+                    return random.uniform(low, high)
+            return MockRandom()
+    np = MockNumpy()
 
 from .config import PrivacyConfig, SecurityConfig, ComplianceConfig
 from .exceptions import AuditTrailError, PrivacyBudgetExceededError
@@ -439,8 +453,8 @@ class AuditableRLHF:
         self.current_session.phase = TrainingPhase.POLICY_UPDATE
         
         # Extract model statistics (mock implementation - replace with actual)
-        parameter_delta_norm = np.random.uniform(0.001, 0.1)  # Replace with actual computation
-        gradient_norm = np.random.uniform(0.1, 2.0)  # Replace with actual computation
+        parameter_delta_norm = np.random().uniform(0.001, 0.1)  # Replace with actual computation
+        gradient_norm = np.random().uniform(0.1, 2.0)  # Replace with actual computation
         learning_rate = 1e-4  # Replace with actual optimizer.param_groups[0]['lr']
         
         # Create policy update record
