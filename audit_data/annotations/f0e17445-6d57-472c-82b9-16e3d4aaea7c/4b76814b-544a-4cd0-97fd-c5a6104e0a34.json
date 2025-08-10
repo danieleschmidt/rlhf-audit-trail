@@ -1,0 +1,1 @@
+{"annotator_ids":["annotator_001","annotator_002"],"metadata":{},"prompts":["What is AI safety?","How does RLHF work?"],"responses":["AI safety focuses on...","RLHF trains models using..."],"rewards":[0.85,0.92],"timestamp":1754831925.770918}

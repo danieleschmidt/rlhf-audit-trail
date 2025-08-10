@@ -59,8 +59,12 @@ class TrainingEvent:
             "data": self.data
         }
         
-        # Create deterministic JSON representation
-        json_bytes = json.dumps(event_data, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        # Create deterministic JSON representation with enum handling
+        try:
+            json_bytes = json.dumps(event_data, sort_keys=True, separators=(',', ':'), default=lambda x: x.value if hasattr(x, 'value') else str(x)).encode('utf-8')
+        except (TypeError, AttributeError):
+            # Fallback: convert complex objects to string
+            json_bytes = json.dumps(event_data, sort_keys=True, separators=(',', ':'), default=str).encode('utf-8')
         
         if hash_algorithm == "SHA-256":
             return hashlib.sha256(json_bytes).hexdigest()
@@ -211,8 +215,8 @@ class AuditLogger:
                 # Recompute hash with chaining data
                 event.hash = event.compute_hash()
             
-            # Sign the event
-            event.signature = await self.crypto.sign_data(event.hash)
+            # Sign the event (crypto.sign_data is synchronous)
+            event.signature = self.crypto.sign_data(event.hash)
             
             # Add to buffer
             self.event_buffer.append(event)

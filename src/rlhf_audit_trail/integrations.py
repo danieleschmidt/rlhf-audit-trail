@@ -14,12 +14,23 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    # Mock classes for when torch is not available
+    class nn:
+        class Module:
+            pass
+    class Optimizer:
+        pass
 
 try:
     from transformers import PreTrainedModel, PreTrainedTokenizer
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
+    # Mock classes for when transformers is not available
+    class PreTrainedModel:
+        pass
+    class PreTrainedTokenizer:
+        pass
 
 try:
     from trl import PPOTrainer, PPOConfig
@@ -27,12 +38,22 @@ try:
     TRL_AVAILABLE = True
 except ImportError:
     TRL_AVAILABLE = False
+    # Mock classes for when trl is not available
+    class PPOTrainer:
+        pass
+    class PPOConfig:
+        pass
+    def respond_to_batch(*args, **kwargs):
+        pass
 
 try:
     import trlx
     TRLX_AVAILABLE = True
 except ImportError:
     TRLX_AVAILABLE = False
+    # Mock module for when trlx is not available
+    class trlx:
+        pass
 
 from .exceptions import AuditTrailError
 

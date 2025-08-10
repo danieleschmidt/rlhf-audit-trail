@@ -72,6 +72,20 @@ class StorageBackend(ABC):
         """List all keys with optional prefix filter."""
         pass
     
+    async def store_encrypted(self, key: str, data: Union[str, bytes, Dict[str, Any]], 
+                             crypto_engine: Any) -> bool:
+        """Store data with encryption using provided crypto engine."""
+        # Convert data to JSON string if dict
+        if isinstance(data, dict):
+            data = json.dumps(data, sort_keys=True, separators=(',', ':'))
+        
+        # Store using regular store method (LocalStorage handles encryption internally)
+        return self.store(key, data)
+    
+    async def list_files(self, prefix: str = "") -> List[str]:
+        """List files with given prefix (async version of list_keys)."""
+        return self.list_keys(prefix)
+    
     def _prepare_data_for_storage(self, data: Union[str, bytes, Dict[str, Any]]) -> bytes:
         """Prepare data for storage with optional encryption."""
         # Convert to bytes

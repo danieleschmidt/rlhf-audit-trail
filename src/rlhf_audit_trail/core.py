@@ -453,8 +453,8 @@ class AuditableRLHF:
         self.current_session.phase = TrainingPhase.POLICY_UPDATE
         
         # Extract model statistics (mock implementation - replace with actual)
-        parameter_delta_norm = np.random().uniform(0.001, 0.1)  # Replace with actual computation
-        gradient_norm = np.random().uniform(0.1, 2.0)  # Replace with actual computation
+        parameter_delta_norm = np.random.uniform(0.001, 0.1)  # Replace with actual computation
+        gradient_norm = np.random.uniform(0.1, 2.0)  # Replace with actual computation
         learning_rate = 1e-4  # Replace with actual optimizer.param_groups[0]['lr']
         
         # Create policy update record
@@ -545,8 +545,8 @@ class AuditableRLHF:
             checkpoint_data, self.current_session
         )
         
-        if not compliance_status.is_compliant:
-            self.logger.warning(f"Compliance issues at checkpoint {checkpoint_id}: {compliance_status.issues}")
+        if not compliance_status.get("is_compliant", True):
+            self.logger.warning(f"Compliance issues at checkpoint {checkpoint_id}: {compliance_status.get('issues', [])}")
         
         self.logger.info(f"Created checkpoint {checkpoint_id} for epoch {epoch}")
     
