@@ -6,7 +6,29 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union, Set, Callable
 from dataclasses import dataclass
 
-from .core import Task, TaskState, QuantumPriority
+# Import types to avoid circular import
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .core import Task, TaskState, QuantumPriority
+
+# Import enum classes directly for runtime
+from enum import Enum
+
+class TaskState(Enum):
+    SUPERPOSITION = "superposition"
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ENTANGLED = "entangled"
+
+class QuantumPriority(Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium" 
+    LOW = "low"
+    DEFERRED = "deferred"
+
 from .exceptions import ValidationError, DependencyError
 
 
@@ -170,8 +192,8 @@ class TaskValidator:
     
     def validate_task_state_transition(
         self,
-        current_state: TaskState,
-        target_state: TaskState,
+        current_state: Any,  # TaskState
+        target_state: Any,   # TaskState
         task_id: str
     ) -> ValidationResult:
         """Validate task state transitions."""
@@ -204,8 +226,8 @@ class TaskValidator:
     
     def validate_entanglement(
         self,
-        task1: Task,
-        task2: Task,
+        task1: Any,  # Task type, avoiding circular import
+        task2: Any,  # Task type, avoiding circular import
         interference_threshold: float = 0.1
     ) -> ValidationResult:
         """Validate task entanglement."""
@@ -307,7 +329,7 @@ class TaskValidator:
             except ValueError:
                 valid_values = [p.value for p in QuantumPriority]
                 result.add_error(f"Invalid priority '{priority}'. Valid values: {valid_values}")
-        elif isinstance(priority, QuantumPriority):
+        elif hasattr(priority, 'value'):  # Any enum with value attribute
             result.sanitized_data['priority'] = priority
         else:
             result.add_error(f"Priority must be string or QuantumPriority enum, got {type(priority).__name__}")
@@ -427,7 +449,7 @@ class TaskValidator:
 class DependencyValidator:
     """Validator for task dependencies and scheduling constraints."""
     
-    def __init__(self, tasks: Dict[str, Task]):
+    def __init__(self, tasks: Dict[str, Any]):  # Task objects
         """Initialize with current task collection."""
         self.tasks = tasks
     
