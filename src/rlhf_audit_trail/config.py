@@ -22,6 +22,10 @@ class ComplianceFramework(Enum):
     NIST_DRAFT = "nist_draft"
     GDPR = "gdpr"
     CCPA = "ccpa"
+    
+    def __json__(self):
+        """Make ComplianceFramework JSON serializable."""
+        return self.value
 
 
 @dataclass

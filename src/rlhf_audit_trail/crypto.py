@@ -75,7 +75,7 @@ class CryptographicEngine:
         """Save keys to disk."""
         try:
             # Save private key
-            private_pem = self._private_key.serialize(
+            private_pem = self._private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption()
@@ -85,7 +85,7 @@ class CryptographicEngine:
             os.chmod('.audit_private_key.pem', 0o600)  # Restrict permissions
             
             # Save public key
-            public_pem = self._public_key.serialize(
+            public_pem = self._public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             )

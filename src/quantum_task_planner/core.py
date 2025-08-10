@@ -109,8 +109,8 @@ class Task:
             self.state = TaskState.PENDING
             logging.info(f"Task {self.name} collapsed to PENDING (p={self.probability:.2f})")
         else:
-            self.state = TaskState.DEFERRED
-            logging.info(f"Task {self.name} collapsed to DEFERRED (p={self.probability:.2f})")
+            self.state = TaskState.FAILED  # Use FAILED instead of non-existent DEFERRED
+            logging.info(f"Task {self.name} collapsed to FAILED (p={self.probability:.2f})")
         
         return self.state
     
@@ -212,7 +212,6 @@ class QuantumTaskPlanner:
         # Setup logging
         self.logger = logging.getLogger(f"quantum_planner.{name}")
         
-    @handle_async_exception
     def create_task(
         self,
         name: str,
