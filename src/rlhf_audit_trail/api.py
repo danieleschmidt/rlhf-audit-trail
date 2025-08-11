@@ -26,79 +26,83 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False) if FASTAPI_AVAILABLE else None
 
 
-# Pydantic models for API
-class TrainingSessionRequest(BaseModel):
-    """Request model for creating training sessions."""
-    experiment_name: str = Field(..., description="Name of the experiment")
-    model_name: str = Field(..., description="Name of the model being trained")
-    privacy_config: Optional[Dict[str, Any]] = Field(None, description="Privacy configuration")
-    compliance_mode: str = Field("eu_ai_act", description="Compliance framework")
+# Pydantic models for API  
+if FASTAPI_AVAILABLE:
+    class TrainingSessionRequest(BaseModel):
+        """Request model for creating training sessions."""
+        experiment_name: str = Field(..., description="Name of the experiment")
+        model_name: str = Field(..., description="Name of the model being trained")
+        privacy_config: Optional[Dict[str, Any]] = Field(None, description="Privacy configuration")
+        compliance_mode: str = Field("eu_ai_act", description="Compliance framework")
 
+    class AnnotationRequest(BaseModel):
+        """Request model for logging annotations."""
+        prompts: List[str] = Field(..., description="List of prompts")
+        responses: List[str] = Field(..., description="List of responses")
+        rewards: List[float] = Field(..., description="List of reward scores")
+        annotator_ids: Optional[List[str]] = Field(None, description="Anonymized annotator IDs")
 
-class AnnotationRequest(BaseModel):
-    """Request model for logging annotations."""
-    prompts: List[str] = Field(..., description="List of prompts")
-    responses: List[str] = Field(..., description="List of responses")
-    rewards: List[float] = Field(..., description="List of reward scores")
-    annotator_ids: Optional[List[str]] = Field(None, description="Anonymized annotator IDs")
+    class PolicyUpdateRequest(BaseModel):
+        """Request model for tracking policy updates."""
+        epoch: int = Field(..., description="Training epoch")
+        metrics: Dict[str, float] = Field(..., description="Training metrics")
+        additional_data: Optional[Dict[str, Any]] = Field(None, description="Additional tracking data")
 
+    class ComplianceReportRequest(BaseModel):
+        """Request model for generating compliance reports."""
+        start_date: Optional[str] = Field(None, description="Start date (ISO format)")
+        end_date: Optional[str] = Field(None, description="End date (ISO format)")
+        include_sections: List[str] = Field(["privacy", "bias", "safety"], description="Report sections")
+        format: str = Field("json", description="Report format (json, html, pdf)")
 
-class PolicyUpdateRequest(BaseModel):
-    """Request model for tracking policy updates."""
-    epoch: int = Field(..., description="Training epoch")
-    metrics: Dict[str, float] = Field(..., description="Training metrics")
-    additional_data: Optional[Dict[str, Any]] = Field(None, description="Additional tracking data")
+    class ModelCardRequest(BaseModel):
+        """Request model for generating model cards."""
+        include_provenance: bool = Field(True, description="Include provenance information")
+        include_privacy_analysis: bool = Field(True, description="Include privacy analysis")
+        format: str = Field("eu_standard", description="Model card format")
 
+    # Response models
+    class TrainingSessionResponse(BaseModel):
+        """Response model for training sessions."""
+        session_id: str
+        experiment_name: str
+        status: str
+        created_at: datetime
+        model_name: str
 
-class ComplianceReportRequest(BaseModel):
-    """Request model for generating compliance reports."""
-    start_date: Optional[str] = Field(None, description="Start date (ISO format)")
-    end_date: Optional[str] = Field(None, description="End date (ISO format)")
-    include_sections: List[str] = Field(["privacy", "bias", "safety"], description="Report sections")
-    format: str = Field("json", description="Report format (json, html, pdf)")
+    class AuditLogResponse(BaseModel):
+        """Response model for audit logs."""
+        timestamp: datetime
+        event_type: str
+        event_data: Dict[str, Any]
+        signature: Optional[str] = None
+        verified: bool = False
 
+    class PrivacyReportResponse(BaseModel):
+        """Response model for privacy reports."""
+        total_epsilon: float
+        remaining_budget: float
+        annotator_count: int
+        privacy_violations: int
 
-class ModelCardRequest(BaseModel):
-    """Request model for generating model cards."""
-    include_provenance: bool = Field(True, description="Include provenance information")
-    include_privacy_analysis: bool = Field(True, description="Include privacy analysis")
-    format: str = Field("eu_standard", description="Model card format")
-
-
-# Response models
-class TrainingSessionResponse(BaseModel):
-    """Response model for training sessions."""
-    session_id: str
-    experiment_name: str
-    status: str
-    created_at: datetime
-    model_name: str
-
-
-class AuditLogResponse(BaseModel):
-    """Response model for audit logs."""
-    timestamp: datetime
-    event_type: str
-    event_data: Dict[str, Any]
-    signature: Optional[str] = None
-    verified: bool = False
-
-
-class PrivacyReportResponse(BaseModel):
-    """Response model for privacy reports."""
-    total_epsilon: float
-    remaining_budget: float
-    annotator_count: int
-    privacy_violations: int
-
-
-class ComplianceStatusResponse(BaseModel):
-    """Response model for compliance status."""
-    framework: str
-    compliant: bool
-    last_check: datetime
-    issues: List[Dict[str, str]]
-    score: float
+    class ComplianceStatusResponse(BaseModel):
+        """Response model for compliance status."""
+        framework: str
+        compliant: bool
+        last_check: datetime
+        issues: List[Dict[str, str]]
+        score: float
+else:
+    # Create dummy classes when FastAPI is not available
+    TrainingSessionRequest = object
+    AnnotationRequest = object
+    PolicyUpdateRequest = object  
+    ComplianceReportRequest = object
+    ModelCardRequest = object
+    TrainingSessionResponse = object
+    AuditLogResponse = object
+    PrivacyReportResponse = object
+    ComplianceStatusResponse = object
 
 
 if FASTAPI_AVAILABLE:

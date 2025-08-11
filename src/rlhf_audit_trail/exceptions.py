@@ -492,6 +492,296 @@ class NetworkError(AuditTrailError):
         self.timeout = timeout
 
 
+class SecurityError(AuditTrailError):
+    """Raised when security violations are detected.
+    
+    This exception is thrown when input validation detects potentially
+    malicious content or when security policies are violated.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        attack_type: Optional[str] = None,
+        blocked_content: Optional[str] = None,
+        severity: str = "high"
+    ):
+        """Initialize security error.
+        
+        Args:
+            message: Error message
+            attack_type: Type of attack detected
+            blocked_content: Content that was blocked
+            severity: Severity level
+        """
+        details = {"severity": severity}
+        if attack_type:
+            details["attack_type"] = attack_type
+        if blocked_content:
+            details["blocked_content"] = blocked_content[:100]  # Limit size
+            
+        super().__init__(
+            message=message,
+            error_code="SECURITY_ERROR",
+            details=details
+        )
+        
+        self.attack_type = attack_type
+        self.blocked_content = blocked_content
+        self.severity = severity
+
+
+class AuthorizationError(AuditTrailError):
+    """Raised when authorization fails.
+    
+    This exception is thrown when a user lacks sufficient permissions
+    to perform a requested operation.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        required_permission: Optional[str] = None,
+        user_role: Optional[str] = None,
+        resource: Optional[str] = None
+    ):
+        """Initialize authorization error.
+        
+        Args:
+            message: Error message
+            required_permission: Permission required for operation
+            user_role: User's current role
+            resource: Resource being accessed
+        """
+        details = {}
+        if required_permission:
+            details["required_permission"] = required_permission
+        if user_role:
+            details["user_role"] = user_role
+        if resource:
+            details["resource"] = resource
+            
+        super().__init__(
+            message=message,
+            error_code="AUTHORIZATION_ERROR",
+            details=details
+        )
+        
+        self.required_permission = required_permission
+        self.user_role = user_role
+        self.resource = resource
+
+
+class MonitoringError(AuditTrailError):
+    """Raised when monitoring operations fail.
+    
+    This exception covers errors in health monitoring, metrics collection,
+    and alerting systems.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        component: Optional[str] = None,
+        metric_name: Optional[str] = None,
+        monitor_type: Optional[str] = None
+    ):
+        """Initialize monitoring error.
+        
+        Args:
+            message: Error message
+            component: Component being monitored
+            metric_name: Metric that failed
+            monitor_type: Type of monitoring operation
+        """
+        details = {}
+        if component:
+            details["component"] = component
+        if metric_name:
+            details["metric_name"] = metric_name
+        if monitor_type:
+            details["monitor_type"] = monitor_type
+            
+        super().__init__(
+            message=message,
+            error_code="MONITORING_ERROR",
+            details=details
+        )
+        
+        self.component = component
+        self.metric_name = metric_name
+        self.monitor_type = monitor_type
+
+
+class PerformanceError(AuditTrailError):
+    """Raised when performance-related operations fail.
+    
+    This exception covers errors in caching, resource pooling,
+    concurrent processing, and performance optimization.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        operation_type: Optional[str] = None,
+        performance_metric: Optional[str] = None,
+        threshold: Optional[float] = None,
+        actual_value: Optional[float] = None
+    ):
+        """Initialize performance error.
+        
+        Args:
+            message: Error message
+            operation_type: Type of performance operation
+            performance_metric: Metric that failed
+            threshold: Performance threshold
+            actual_value: Actual measured value
+        """
+        details = {}
+        if operation_type:
+            details["operation_type"] = operation_type
+        if performance_metric:
+            details["performance_metric"] = performance_metric
+        if threshold is not None:
+            details["threshold"] = threshold
+        if actual_value is not None:
+            details["actual_value"] = actual_value
+            
+        super().__init__(
+            message=message,
+            error_code="PERFORMANCE_ERROR",
+            details=details
+        )
+        
+        self.operation_type = operation_type
+        self.performance_metric = performance_metric
+        self.threshold = threshold
+        self.actual_value = actual_value
+
+
+class ScalingError(AuditTrailError):
+    """Raised when auto-scaling operations fail.
+    
+    This exception covers errors in auto-scaling decisions,
+    instance management, and load balancing.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        scaling_action: Optional[str] = None,
+        target_instances: Optional[int] = None,
+        current_instances: Optional[int] = None
+    ):
+        """Initialize scaling error.
+        
+        Args:
+            message: Error message
+            scaling_action: Scaling action attempted
+            target_instances: Target number of instances
+            current_instances: Current number of instances
+        """
+        details = {}
+        if scaling_action:
+            details["scaling_action"] = scaling_action
+        if target_instances is not None:
+            details["target_instances"] = target_instances
+        if current_instances is not None:
+            details["current_instances"] = current_instances
+            
+        super().__init__(
+            message=message,
+            error_code="SCALING_ERROR",
+            details=details
+        )
+        
+        self.scaling_action = scaling_action
+        self.target_instances = target_instances
+        self.current_instances = current_instances
+
+
+class LoadBalancingError(AuditTrailError):
+    """Raised when load balancing operations fail.
+    
+    This exception covers errors in request distribution,
+    instance health checking, and traffic management.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        strategy: Optional[str] = None,
+        healthy_instances: Optional[int] = None,
+        total_instances: Optional[int] = None
+    ):
+        """Initialize load balancing error.
+        
+        Args:
+            message: Error message
+            strategy: Load balancing strategy
+            healthy_instances: Number of healthy instances
+            total_instances: Total number of instances
+        """
+        details = {}
+        if strategy:
+            details["strategy"] = strategy
+        if healthy_instances is not None:
+            details["healthy_instances"] = healthy_instances
+        if total_instances is not None:
+            details["total_instances"] = total_instances
+            
+        super().__init__(
+            message=message,
+            error_code="LOAD_BALANCING_ERROR",
+            details=details
+        )
+        
+        self.strategy = strategy
+        self.healthy_instances = healthy_instances
+        self.total_instances = total_instances
+
+
+class CacheError(AuditTrailError):
+    """Raised when caching operations fail.
+    
+    This exception covers errors in cache operations,
+    cache invalidation, and cache consistency.
+    """
+    
+    def __init__(
+        self,
+        message: str,
+        cache_operation: Optional[str] = None,
+        cache_key: Optional[str] = None,
+        cache_size: Optional[int] = None
+    ):
+        """Initialize cache error.
+        
+        Args:
+            message: Error message
+            cache_operation: Cache operation that failed
+            cache_key: Cache key involved
+            cache_size: Current cache size
+        """
+        details = {}
+        if cache_operation:
+            details["cache_operation"] = cache_operation
+        if cache_key:
+            details["cache_key"] = cache_key[:50]  # Limit size
+        if cache_size is not None:
+            details["cache_size"] = cache_size
+            
+        super().__init__(
+            message=message,
+            error_code="CACHE_ERROR",
+            details=details
+        )
+        
+        self.cache_operation = cache_operation
+        self.cache_key = cache_key
+        self.cache_size = cache_size
+
+
 class ResourceExhaustedError(AuditTrailError):
     """Raised when system resources are exhausted.
     

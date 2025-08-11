@@ -16,6 +16,26 @@ try:
     STREAMLIT_AVAILABLE = True
 except ImportError:
     STREAMLIT_AVAILABLE = False
+    # Mock pandas and plotly for type hints
+    class MockFigure:
+        pass
+    
+    class MockGraphObjects:
+        Figure = MockFigure
+    
+    class MockPandas:
+        class DataFrame:
+            pass
+        def date_range(self, **kwargs):
+            return []
+    
+    class MockPlotly:
+        Figure = MockFigure
+    
+    pd = MockPandas()
+    go = MockGraphObjects()
+    px = MockPlotly()
+    st = object  # Mock streamlit
 
 from .core import AuditableRLHF
 from .config import PrivacyConfig, ComplianceConfig

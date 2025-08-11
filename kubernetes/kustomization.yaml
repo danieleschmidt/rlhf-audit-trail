@@ -1,0 +1,115 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: rlhf-audit-trail
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: rlhf-audit-trail
+  app.kubernetes.io/part-of: rlhf-audit-trail
+  app.kubernetes.io/managed-by: kustomize
+
+# Resources to include in this kustomization
+resources:
+- namespace.yaml
+- secrets.yaml
+- configmaps.yaml
+- postgresql.yaml
+- deployment.yaml
+- autoscaling.yaml
+
+# Images to use (can be overridden for different environments)
+images:
+- name: rlhf-audit-trail
+  newTag: "1.0.0"
+- name: postgres
+  newTag: "15-alpine"
+
+# ConfigMap generator for environment-specific configs
+configMapGenerator:
+- name: rlhf-audit-trail-environment
+  literals:
+  - DEPLOYMENT_ENVIRONMENT=production
+  - KUBERNETES_NAMESPACE=rlhf-audit-trail
+  - BUILD_VERSION=1.0.0
+  - BUILD_DATE=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Secret generator for sensitive data
+secretGenerator:
+- name: rlhf-audit-trail-generated-secrets
+  type: Opaque
+  literals:
+  - generated-secret-key=$(shell python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+  - session-secret=$(shell python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+
+# Namespace for all resources
+namespace: rlhf-audit-trail
+
+# Patches for environment-specific customizations
+patchesStrategicMerge:
+- |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: rlhf-audit-trail
+    namespace: rlhf-audit-trail
+  spec:
+    template:
+      spec:
+        containers:
+        - name: rlhf-audit-trail
+          env:
+          - name: BUILD_VERSION
+            value: "1.0.0"
+          - name: DEPLOYMENT_TIMESTAMP
+            value: "$(shell date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# JSON patches for fine-grained modifications
+patchesJson6902:
+- target:
+    version: v1
+    kind: Secret
+    name: rlhf-audit-trail-secrets
+    namespace: rlhf-audit-trail
+  patch: |-
+    - op: replace
+      path: /metadata/annotations
+      value:
+        kubectl.kubernetes.io/last-applied-configuration: ""
+        config.kubernetes.io/origin: "kustomize"
+
+# Replicas configuration
+replicas:
+- name: rlhf-audit-trail
+  count: 3
+- name: postgresql
+  count: 1
+
+# Name prefix and suffix
+namePrefix: ""
+nameSuffix: ""
+
+# Transformers for additional modifications
+transformers: []
+
+# Generators for additional resources
+generators: []
+
+# Build options
+buildMetadata:
+- managedByLabel
+- originAnnotation
+
+# OpenAPI schema validation
+openapi:
+  path: "https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/swagger.json"
+
+# Inventory configuration
+inventory:
+  type: ConfigMap
+  configMap:
+    name: inventory
+    namespace: rlhf-audit-trail

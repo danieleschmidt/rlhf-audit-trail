@@ -1,0 +1,176 @@
+# Multi-stage production Dockerfile for RLHF Audit Trail
+# Optimized for security, performance, and minimal attack surface
+
+# ================================================================================================
+# Stage 1: Build Dependencies and Compile
+# ================================================================================================
+FROM python:3.11-slim as builder
+
+# Set build arguments
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+
+# Set labels for container metadata
+LABEL maintainer="Terragon Labs <support@terragonlabs.com>"
+LABEL version="${VERSION}"
+LABEL build-date="${BUILD_DATE}"
+LABEL vcs-ref="${VCS_REF}"
+LABEL description="RLHF Audit Trail - Production Container"
+LABEL org.opencontainers.image.title="RLHF Audit Trail"
+LABEL org.opencontainers.image.description="Verifiable provenance for RLHF with EU AI Act compliance"
+LABEL org.opencontainers.image.vendor="Terragon Labs"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.source="https://github.com/terragonlabs/rlhf-audit-trail"
+
+# Install system dependencies and build tools
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    build-essential \
+    curl \
+    gcc \
+    g++ \
+    git \
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create application directory
+WORKDIR /app
+
+# Copy requirements first for better layer caching
+COPY requirements.txt requirements-prod.txt ./
+COPY pyproject.toml ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-prod.txt && \
+    # Install production WSGI server
+    pip install --no-cache-dir gunicorn uvicorn[standard] && \
+    # Cleanup
+    pip cache purge
+
+# Copy source code
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY migrations/ ./migrations/
+
+# Create wheels for the application
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -e .
+
+# ================================================================================================
+# Stage 2: Runtime Container  
+# ================================================================================================
+FROM python:3.11-slim as runtime
+
+# Set runtime arguments
+ARG BUILD_DATE
+ARG VCS_REF
+ARG VERSION
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app/src \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Application settings
+    RLHF_AUDIT_ENV=production \
+    RLHF_AUDIT_LOG_LEVEL=INFO \
+    RLHF_AUDIT_WORKERS=4 \
+    RLHF_AUDIT_PORT=8000 \
+    RLHF_AUDIT_HOST=0.0.0.0 \
+    # Security settings
+    RLHF_AUDIT_SECRET_KEY_FILE=/run/secrets/secret_key \
+    RLHF_AUDIT_DB_PASSWORD_FILE=/run/secrets/db_password \
+    # Compliance settings
+    RLHF_AUDIT_COMPLIANCE_MODE=eu_ai_act \
+    RLHF_AUDIT_REGION=EU \
+    RLHF_AUDIT_ENCRYPTION_ENABLED=true
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    ca-certificates \
+    curl \
+    dumb-init \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for security
+RUN groupadd -g ${GROUP_ID} -r rlhf && \
+    useradd -u ${USER_ID} -g rlhf -r -m -d /app -s /bin/bash rlhf
+
+# Create application directories
+WORKDIR /app
+RUN mkdir -p \
+    /app/data \
+    /app/logs \
+    /app/temp \
+    /app/audit_data \
+    /run/secrets \
+    && chown -R rlhf:rlhf /app /run/secrets
+
+# Copy wheels and install application
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt ./
+RUN pip install --no-cache-dir --no-index --find-links /wheels rlhf-audit-trail && \
+    pip install --no-cache-dir gunicorn uvicorn[standard] && \
+    rm -rf /wheels && \
+    pip cache purge
+
+# Copy application code with proper permissions
+COPY --from=builder --chown=rlhf:rlhf /app/src ./src
+COPY --from=builder --chown=rlhf:rlhf /app/scripts ./scripts
+COPY --from=builder --chown=rlhf:rlhf /app/migrations ./migrations
+
+# Copy production configuration files
+COPY --chown=rlhf:rlhf docker/entrypoint.sh ./entrypoint.sh
+COPY --chown=rlhf:rlhf docker/healthcheck.py ./healthcheck.py
+COPY --chown=rlhf:rlhf docker/gunicorn.conf.py ./gunicorn.conf.py
+
+# Make scripts executable
+RUN chmod +x ./entrypoint.sh ./healthcheck.py
+
+# Switch to non-root user
+USER rlhf
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python /app/healthcheck.py || exit 1
+
+# Volume for persistent data
+VOLUME ["/app/data", "/app/logs", "/app/audit_data"]
+
+# Use dumb-init to handle signal forwarding
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+# Default command
+CMD ["./entrypoint.sh"]
+
+# ================================================================================================
+# Container Metadata
+# ================================================================================================
+LABEL org.opencontainers.image.title="RLHF Audit Trail"
+LABEL org.opencontainers.image.description="Production-ready RLHF audit trail with compliance"
+LABEL org.opencontainers.image.vendor="Terragon Labs"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${VCS_REF}"
+LABEL org.opencontainers.image.source="https://github.com/terragonlabs/rlhf-audit-trail"
+LABEL org.opencontainers.image.documentation="https://github.com/terragonlabs/rlhf-audit-trail/blob/main/README.md"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+# Security labels
+LABEL security.non-root=true
+LABEL security.hardened=true
+LABEL security.compliance="EU AI Act, GDPR, NIST"

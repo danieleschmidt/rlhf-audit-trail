@@ -5,7 +5,43 @@ privacy while maintaining utility for RLHF training.
 """
 
 import math
-import numpy as np
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    # Mock numpy for basic functionality
+    class MockNumpy:
+        def random(self):
+            import random
+            class MockRandom:
+                def normal(self, loc=0.0, scale=1.0, size=None):
+                    if size is None:
+                        return random.gauss(loc, scale)
+                    return [random.gauss(loc, scale) for _ in range(size)]
+                def uniform(self, low, high, size=None):
+                    if size is None:
+                        return random.uniform(low, high)
+                    return [random.uniform(low, high) for _ in range(size)]
+            return MockRandom()
+        
+        def array(self, data):
+            return data
+        
+        def mean(self, data):
+            return sum(data) / len(data)
+        
+        def std(self, data):
+            mean_val = self.mean(data)
+            variance = sum((x - mean_val) ** 2 for x in data) / len(data)
+            return variance ** 0.5
+        
+        def clip(self, data, a_min, a_max):
+            return [max(a_min, min(a_max, x)) for x in data]
+    
+    np = MockNumpy()
+    # Add ndarray attribute for type hints
+    np.ndarray = list  # Use list as ndarray replacement
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Any, Tuple
