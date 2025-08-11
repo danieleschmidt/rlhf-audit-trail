@@ -432,7 +432,14 @@ async def main():
 
 def cli_main():
     """Synchronous entry point for setuptools."""
-    return asyncio.run(main())
+    try:
+        return asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nOperation cancelled")
+        return 130
+    except Exception as e:
+        print(f"CLI Error: {e}")
+        return 1
 
 
 if __name__ == "__main__":

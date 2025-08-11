@@ -1,0 +1,227 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rlhf-audit-trail-config
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: config
+data:
+  # Application configuration
+  RLHF_AUDIT_ENV: "production"
+  RLHF_AUDIT_LOG_LEVEL: "INFO"
+  RLHF_AUDIT_HOST: "0.0.0.0"
+  RLHF_AUDIT_PORT: "8000"
+  RLHF_AUDIT_WORKERS: "4"
+  
+  # Privacy and compliance settings
+  RLHF_AUDIT_COMPLIANCE_MODE: "eu_ai_act"
+  RLHF_AUDIT_REGION: "EU"
+  RLHF_AUDIT_ENCRYPTION_ENABLED: "true"
+  RLHF_AUDIT_PRIVACY_MODE: "strict"
+  
+  # Performance settings
+  RLHF_AUDIT_MAX_REQUESTS: "1000"
+  RLHF_AUDIT_MAX_CONNECTIONS: "100"
+  RLHF_AUDIT_REQUEST_TIMEOUT: "30"
+  
+  # Monitoring and observability
+  RLHF_AUDIT_METRICS_ENABLED: "true"
+  RLHF_AUDIT_TRACING_ENABLED: "true"
+  RLHF_AUDIT_HEALTH_CHECK_INTERVAL: "30"
+  
+  # Storage settings
+  RLHF_AUDIT_STORAGE_BACKEND: "postgresql"
+  RLHF_AUDIT_BACKUP_ENABLED: "true"
+  RLHF_AUDIT_BACKUP_INTERVAL: "3600"
+  
+  # Security settings
+  RLHF_AUDIT_RATE_LIMITING_ENABLED: "true"
+  RLHF_AUDIT_RATE_LIMIT_REQUESTS: "1000"
+  RLHF_AUDIT_RATE_LIMIT_WINDOW: "3600"
+  
+  # Multi-region settings
+  RLHF_AUDIT_MULTI_REGION_ENABLED: "true"
+  RLHF_AUDIT_PRIMARY_REGION: "eu-west-1"
+  RLHF_AUDIT_BACKUP_REGIONS: "eu-central-1,eu-west-3"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rlhf-audit-trail-scripts
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: scripts
+data:
+  # Database initialization script
+  init-db.sh: |
+    #!/bin/bash
+    set -e
+    echo "Initializing RLHF Audit Trail database..."
+    
+    # Wait for database to be ready
+    until python3 -c "
+    import sys
+    import os
+    sys.path.insert(0, '/app/src')
+    from rlhf_audit_trail.database import DatabaseManager
+    try:
+        db = DatabaseManager(os.environ.get('RLHF_AUDIT_DATABASE_URL'))
+        import asyncio
+        result = asyncio.run(db.health_check())
+        if result['status'] != 'healthy':
+            sys.exit(1)
+    except Exception:
+        sys.exit(1)
+    "; do
+      echo "Waiting for database to be ready..."
+      sleep 5
+    done
+    
+    echo "Database is ready. Initializing tables..."
+    python3 -c "
+    import sys
+    import os
+    sys.path.insert(0, '/app/src')
+    from rlhf_audit_trail.database import DatabaseManager
+    db = DatabaseManager(os.environ.get('RLHF_AUDIT_DATABASE_URL'))
+    print('Database initialization complete')
+    "
+    
+    echo "Database initialization completed successfully"
+  
+  # Backup script
+  backup.sh: |
+    #!/bin/bash
+    set -e
+    
+    BACKUP_DIR="/app/backups"
+    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+    BACKUP_FILE="rlhf_audit_backup_${TIMESTAMP}.sql"
+    
+    echo "Starting backup at $(date)"
+    
+    # Create backup directory
+    mkdir -p "${BACKUP_DIR}"
+    
+    # Perform database backup based on type
+    if [[ "${RLHF_AUDIT_DATABASE_URL}" == postgresql* ]]; then
+        # PostgreSQL backup
+        pg_dump "${RLHF_AUDIT_DATABASE_URL}" > "${BACKUP_DIR}/${BACKUP_FILE}"
+    elif [[ "${RLHF_AUDIT_DATABASE_URL}" == mysql* ]]; then
+        # MySQL backup
+        mysqldump --single-transaction --routines --triggers "${RLHF_AUDIT_DATABASE_URL#mysql://}" > "${BACKUP_DIR}/${BACKUP_FILE}"
+    else
+        echo "Backup not supported for database type: ${RLHF_AUDIT_DATABASE_URL}"
+        exit 1
+    fi
+    
+    # Compress backup
+    gzip "${BACKUP_DIR}/${BACKUP_FILE}"
+    
+    # Clean up old backups (keep last 7 days)
+    find "${BACKUP_DIR}" -name "rlhf_audit_backup_*.sql.gz" -mtime +7 -delete
+    
+    echo "Backup completed: ${BACKUP_FILE}.gz"
+  
+  # Health check script
+  health-check.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Simple health check that can be used in liveness/readiness probes
+    curl -f -s http://localhost:8000/health > /dev/null
+    
+    # Check database connection
+    python3 /app/healthcheck.py --quick
+  
+  # Monitoring script
+  collect-metrics.sh: |
+    #!/bin/bash
+    
+    # Collect application metrics for monitoring
+    METRICS_FILE="/tmp/app_metrics.json"
+    
+    # Get system metrics
+    echo "{"
+    echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+    echo "  \"cpu_usage\": $(python3 -c "import psutil; print(psutil.cpu_percent())" 2>/dev/null || echo "0"),"
+    echo "  \"memory_usage\": $(python3 -c "import psutil; print(psutil.virtual_memory().percent)" 2>/dev/null || echo "0"),"
+    echo "  \"disk_usage\": $(python3 -c "import psutil; print(psutil.disk_usage('/').percent)" 2>/dev/null || echo "0")"
+    echo "}" > "${METRICS_FILE}"
+    
+    # Output for monitoring systems
+    cat "${METRICS_FILE}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rlhf-audit-trail-logging
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: logging
+data:
+  # Logging configuration
+  logging.conf: |
+    [loggers]
+    keys=root,rlhf_audit_trail,gunicorn,uvicorn
+    
+    [handlers]
+    keys=consoleHandler,fileHandler,auditHandler
+    
+    [formatters]
+    keys=standardFormatter,auditFormatter,jsonFormatter
+    
+    [logger_root]
+    level=INFO
+    handlers=consoleHandler,fileHandler
+    
+    [logger_rlhf_audit_trail]
+    level=INFO
+    handlers=consoleHandler,fileHandler,auditHandler
+    qualname=rlhf_audit_trail
+    propagate=0
+    
+    [logger_gunicorn]
+    level=INFO
+    handlers=consoleHandler,fileHandler
+    qualname=gunicorn
+    propagate=0
+    
+    [logger_uvicorn]
+    level=INFO
+    handlers=consoleHandler,fileHandler
+    qualname=uvicorn
+    propagate=0
+    
+    [handler_consoleHandler]
+    class=StreamHandler
+    level=INFO
+    formatter=jsonFormatter
+    args=(sys.stdout,)
+    
+    [handler_fileHandler]
+    class=handlers.RotatingFileHandler
+    level=INFO
+    formatter=standardFormatter
+    args=('/app/logs/application.log', 'a', 10485760, 5)
+    
+    [handler_auditHandler]
+    class=handlers.RotatingFileHandler
+    level=INFO
+    formatter=auditFormatter
+    args=('/app/logs/audit.log', 'a', 104857600, 10)
+    
+    [formatter_standardFormatter]
+    format=%(asctime)s - %(name)s - %(levelname)s - %(message)s
+    datefmt=%Y-%m-%d %H:%M:%S
+    
+    [formatter_auditFormatter]
+    format=%(asctime)s - AUDIT - %(levelname)s - %(message)s
+    datefmt=%Y-%m-%d %H:%M:%S
+    
+    [formatter_jsonFormatter]
+    format={"timestamp": "%(asctime)s", "logger": "%(name)s", "level": "%(levelname)s", "message": "%(message)s"}
+    datefmt=%Y-%m-%dT%H:%M:%SZ

@@ -61,7 +61,7 @@ if SQLALCHEMY_AVAILABLE:
         start_time = Column(DateTime, nullable=False, index=True)
         end_time = Column(DateTime, nullable=True)
         status = Column(String(50), nullable=False, default='active')
-        metadata = Column(JSON, nullable=True)
+        session_metadata = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow)
         updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
         
@@ -82,7 +82,7 @@ if SQLALCHEMY_AVAILABLE:
         batch_size = Column(Integer, nullable=False)
         privacy_cost = Column(Float, nullable=False)
         timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-        metadata = Column(JSON, nullable=True)
+        batch_metadata = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow)
         
         def __repr__(self):
@@ -101,7 +101,7 @@ if SQLALCHEMY_AVAILABLE:
         gradient_norm = Column(Float, nullable=False)
         learning_rate = Column(Float, nullable=False)
         timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-        metadata = Column(JSON, nullable=True)
+        batch_metadata = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow)
         
         def __repr__(self):
@@ -120,7 +120,7 @@ if SQLALCHEMY_AVAILABLE:
         issues = Column(JSON, nullable=True)
         recommendations = Column(JSON, nullable=True)
         timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-        metadata = Column(JSON, nullable=True)
+        batch_metadata = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow)
         
         def __repr__(self):
@@ -140,7 +140,7 @@ if SQLALCHEMY_AVAILABLE:
         remaining_epsilon = Column(Float, nullable=False)
         remaining_delta = Column(Float, nullable=False)
         timestamp = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-        metadata = Column(JSON, nullable=True)
+        batch_metadata = Column(JSON, nullable=True)
         created_at = Column(DateTime, default=datetime.utcnow)
         
         def __repr__(self):

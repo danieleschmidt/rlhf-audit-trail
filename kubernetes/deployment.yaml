@@ -1,212 +1,412 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quantum-task-planner
+  name: rlhf-audit-trail
+  namespace: rlhf-audit-trail
   labels:
-    app: quantum-task-planner
-    version: v1
-    component: backend
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: rlhf-audit-trail
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
 spec:
   replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
-      app: quantum-task-planner
+      app.kubernetes.io/name: rlhf-audit-trail
+      app.kubernetes.io/component: application
   template:
     metadata:
       labels:
-        app: quantum-task-planner
-        version: v1
+        app.kubernetes.io/name: rlhf-audit-trail
+        app.kubernetes.io/version: "1.0.0"
+        app.kubernetes.io/component: application
+        app.kubernetes.io/part-of: rlhf-audit-trail
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: quantum-task-planner
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
-      containers:
-      - name: quantum-planner
-        image: quantum-task-planner:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8000
-          name: http
+        seccompProfile:
+          type: RuntimeDefault
+      
+      serviceAccountName: rlhf-audit-trail-sa
+      
+      initContainers:
+      - name: database-migration
+        image: rlhf-audit-trail:1.0.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "/scripts/init-db.sh"]
         env:
-        - name: QUANTUM_PLANNER_ENV
-          value: "production"
-        - name: QUANTUM_PLANNER_LOG_LEVEL
-          value: "INFO"
-        - name: QUANTUM_PLANNER_API_HOST
-          value: "0.0.0.0"
-        - name: QUANTUM_PLANNER_API_PORT
-          value: "8000"
-        - name: REDIS_URL
+        - name: RLHF_AUDIT_DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: quantum-secrets
-              key: redis-url
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: quantum-secrets
-              key: database-url
-        - name: SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: quantum-secrets
-              key: secret-key
+              name: rlhf-audit-trail-db
+              key: database-url-postgres
+        envFrom:
+        - configMapRef:
+            name: rlhf-audit-trail-config
+        - secretRef:
+            name: rlhf-audit-trail-secrets
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            cpu: 100m
+            memory: 256Mi
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      
+      containers:
+      - name: rlhf-audit-trail
+        image: rlhf-audit-trail:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 8001
+          protocol: TCP
+        
+        env:
+        - name: RLHF_AUDIT_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: rlhf-audit-trail-db
+              key: database-url-postgres
+        - name: RLHF_AUDIT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: rlhf-audit-trail-secrets
+              key: secret-key
+        - name: RLHF_AUDIT_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: rlhf-audit-trail-secrets
+              key: encryption-key
+        - name: PYTHONPATH
+          value: "/app/src"
+        
+        envFrom:
+        - configMapRef:
+            name: rlhf-audit-trail-config
+        - secretRef:
+            name: rlhf-audit-trail-secrets
+        
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: app-logs
+          mountPath: /app/logs
+        - name: audit-data
+          mountPath: /app/audit_data
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+        - name: logging-config
+          mountPath: /app/logging.conf
+          subPath: logging.conf
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: var-run
+          mountPath: /var/run
+        
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+            ephemeral-storage: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+            ephemeral-storage: 5Gi
+        
         livenessProbe:
           httpGet:
             path: /health
             port: http
+            scheme: HTTP
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 10
           failureThreshold: 3
+          successThreshold: 1
+        
         readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        
+        startupProbe:
           httpGet:
             path: /health
             port: http
-          initialDelaySeconds: 5
+            scheme: HTTP
+          initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
-        volumeMounts:
-        - name: quantum-data
-          mountPath: /app/data
-        - name: quantum-logs
-          mountPath: /app/logs
-        - name: config-volume
-          mountPath: /app/config
-          readOnly: true
+          failureThreshold: 30
+          successThreshold: 1
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+        
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "Received SIGTERM, starting graceful shutdown..."
+                sleep 15
+      
       volumes:
-      - name: quantum-data
+      - name: app-data
         persistentVolumeClaim:
-          claimName: quantum-data-pvc
-      - name: quantum-logs
+          claimName: rlhf-audit-trail-data-pvc
+      - name: app-logs
         persistentVolumeClaim:
-          claimName: quantum-logs-pvc
-      - name: config-volume
+          claimName: rlhf-audit-trail-logs-pvc
+      - name: audit-data
+        persistentVolumeClaim:
+          claimName: rlhf-audit-trail-audit-pvc
+      - name: scripts
         configMap:
-          name: quantum-config
+          name: rlhf-audit-trail-scripts
+          defaultMode: 0755
+      - name: logging-config
+        configMap:
+          name: rlhf-audit-trail-logging
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: var-run
+        emptyDir:
+          sizeLimit: 100Mi
+      
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - rlhf-audit-trail
+              topologyKey: kubernetes.io/hostname
+      
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: quantum-task-planner-service
+  name: rlhf-audit-trail-service
+  namespace: rlhf-audit-trail
   labels:
-    app: quantum-task-planner
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: application
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   ports:
-  - port: 8000
+  - name: http
+    port: 8000
     targetPort: http
     protocol: TCP
-    name: http
+  - name: metrics
+    port: 8001
+    targetPort: metrics
+    protocol: TCP
   selector:
-    app: quantum-task-planner
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: application
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: quantum-task-planner
+  name: rlhf-audit-trail-sa
+  namespace: rlhf-audit-trail
   labels:
-    app: quantum-task-planner
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: rbac
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rlhf-audit-trail-role
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rlhf-audit-trail-rolebinding
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: rlhf-audit-trail-sa
+  namespace: rlhf-audit-trail
+roleRef:
+  kind: Role
+  name: rlhf-audit-trail-role
+  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: quantum-task-planner-ingress
+  name: rlhf-audit-trail-ingress
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: ingress
   annotations:
     kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
     nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://yourdomain.com"
 spec:
   tls:
   - hosts:
-    - quantum-planner.yourdomain.com
-    secretName: quantum-planner-tls
+    - rlhf-audit.yourdomain.com
+    - api.rlhf-audit.yourdomain.com
+    secretName: rlhf-audit-trail-tls
   rules:
-  - host: quantum-planner.yourdomain.com
+  - host: rlhf-audit.yourdomain.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: quantum-task-planner-service
+            name: rlhf-audit-trail-service
+            port:
+              number: 8000
+  - host: api.rlhf-audit.yourdomain.com
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: rlhf-audit-trail-service
             port:
               number: 8000
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: quantum-data-pvc
+  name: rlhf-audit-trail-data-pvc
+  namespace: rlhf-audit-trail
   labels:
-    app: quantum-task-planner
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: gp2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rlhf-audit-trail-logs-pvc
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: storage
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: fast-ssd
+  storageClassName: gp2
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: quantum-logs-pvc
+  name: rlhf-audit-trail-audit-pvc
+  namespace: rlhf-audit-trail
   labels:
-    app: quantum-task-planner
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: storage
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
-  storageClassName: standard
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: quantum-config
-  labels:
-    app: quantum-task-planner
-data:
-  config.yaml: |
-    quantum_planner:
-      coherence_preservation: true
-      entanglement_enabled: true
-      interference_threshold: 0.3
-      
-      performance:
-        enable_caching: true
-        cache_size: 1000
-        max_worker_threads: 4
-        batch_size: 10
-        enable_parallel_scheduling: true
-        auto_scaling_enabled: true
-        
-      security:
-        max_concurrent_tasks: 100
-        max_total_tasks: 10000
-        rate_limiting:
-          max_tasks_per_minute: 1000
-          max_tasks_per_hour: 10000
-        
-      monitoring:
-        metrics_enabled: true
-        health_checks_enabled: true
-        log_level: INFO
-        
-      integration:
-        enable_rest_api: true
-        enable_webhooks: false
-        enable_message_queue: true
-        queue_type: redis
+      storage: 50Gi
+  storageClassName: gp2

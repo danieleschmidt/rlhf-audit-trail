@@ -1,0 +1,333 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rlhf-audit-trail-hpa
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rlhf-audit-trail
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Custom metrics scaling based on request rate
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  
+  # External metrics for advanced scaling
+  - type: External
+    external:
+      metric:
+        name: queue_length
+        selector:
+          matchLabels:
+            queue: "audit-processing"
+      target:
+        type: AverageValue
+        averageValue: "10"
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: rlhf-audit-trail-vpa
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: autoscaling
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rlhf-audit-trail
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 2
+  resourcePolicy:
+    containerPolicies:
+    - containerName: rlhf-audit-trail
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      maxAllowed:
+        cpu: 4000m
+        memory: 8Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+    - containerName: database-migration
+      mode: "Off"  # Don't autoscale init containers
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rlhf-audit-trail-pdb
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: availability
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rlhf-audit-trail
+      app.kubernetes.io/component: application
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rlhf-audit-trail-network-policy
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rlhf-audit-trail
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow traffic from ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8001
+  
+  # Allow traffic from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8001
+  
+  # Allow inter-pod communication within namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: rlhf-audit-trail
+    ports:
+    - protocol: TCP
+      port: 8000
+  
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  
+  # Allow database connections
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  
+  # Allow HTTPS outbound for external APIs
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  
+  # Allow HTTP for health checks and external services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+---
+# ServiceMonitor for Prometheus scraping
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rlhf-audit-trail-metrics
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rlhf-audit-trail
+      app.kubernetes.io/component: application
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+    honorLabels: true
+  - port: http
+    interval: 60s
+    path: /health/metrics
+    scrapeTimeout: 10s
+    honorLabels: true
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rlhf-audit-trail-alerts
+  namespace: rlhf-audit-trail
+  labels:
+    app.kubernetes.io/name: rlhf-audit-trail
+    app.kubernetes.io/component: monitoring
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: rlhf-audit-trail
+    interval: 30s
+    rules:
+    # High error rate alert
+    - alert: RLHFAuditTrailHighErrorRate
+      expr: |
+        (
+          rate(http_requests_total{job="rlhf-audit-trail-metrics",code=~"5.."}[5m]) /
+          rate(http_requests_total{job="rlhf-audit-trail-metrics"}[5m])
+        ) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: rlhf-audit-trail
+      annotations:
+        summary: "High error rate detected"
+        description: "RLHF Audit Trail error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+    
+    # High response time alert
+    - alert: RLHFAuditTrailHighLatency
+      expr: |
+        histogram_quantile(0.95,
+          rate(http_request_duration_seconds_bucket{job="rlhf-audit-trail-metrics"}[5m])
+        ) > 2
+      for: 5m
+      labels:
+        severity: warning
+        service: rlhf-audit-trail
+      annotations:
+        summary: "High response time detected"
+        description: "RLHF Audit Trail 95th percentile latency is {{ $value }}s for the last 5 minutes"
+    
+    # Pod crash looping alert
+    - alert: RLHFAuditTrailPodCrashLooping
+      expr: |
+        rate(kube_pod_container_status_restarts_total{namespace="rlhf-audit-trail",pod=~"rlhf-audit-trail-.*"}[5m]) * 60 * 5 > 0
+      for: 5m
+      labels:
+        severity: critical
+        service: rlhf-audit-trail
+      annotations:
+        summary: "Pod is crash looping"
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is crash looping"
+    
+    # Database connection alert
+    - alert: RLHFAuditTrailDatabaseDown
+      expr: |
+        up{job="postgres-exporter"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: rlhf-audit-trail
+      annotations:
+        summary: "Database connection failed"
+        description: "RLHF Audit Trail cannot connect to the database"
+    
+    # Privacy budget exhaustion alert
+    - alert: RLHFAuditTrailPrivacyBudgetLow
+      expr: |
+        rlhf_privacy_budget_remaining_ratio < 0.1
+      for: 1m
+      labels:
+        severity: warning
+        service: rlhf-audit-trail
+      annotations:
+        summary: "Privacy budget running low"
+        description: "RLHF Audit Trail privacy budget is at {{ $value | humanizePercentage }} remaining"
+    
+    # Audit trail integrity alert
+    - alert: RLHFAuditTrailIntegrityViolation
+      expr: |
+        increase(rlhf_audit_integrity_violations_total[5m]) > 0
+      for: 0s
+      labels:
+        severity: critical
+        service: rlhf-audit-trail
+      annotations:
+        summary: "Audit trail integrity violation detected"
+        description: "{{ $value }} integrity violations detected in the last 5 minutes"
+    
+    # Disk space alert
+    - alert: RLHFAuditTrailDiskSpaceLow
+      expr: |
+        (
+          node_filesystem_avail_bytes{mountpoint="/app/audit_data"} /
+          node_filesystem_size_bytes{mountpoint="/app/audit_data"}
+        ) < 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: rlhf-audit-trail
+      annotations:
+        summary: "Low disk space on audit data volume"
+        description: "Audit data disk space is {{ $value | humanizePercentage }} remaining"
