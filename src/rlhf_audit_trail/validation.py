@@ -48,6 +48,24 @@ class ValidationResult:
     """Result of a validation operation."""
     is_valid: bool
     issues: List[ValidationIssue]
+    sanitized_data: Optional[Dict[str, Any]] = None
+    security_threats: List[str] = None
+    
+    def __post_init__(self):
+        if self.security_threats is None:
+            self.security_threats = []
+            
+    @property
+    def has_errors(self) -> bool:
+        """Check if there are any error-level issues."""
+        return any(issue.severity in [ValidationSeverity.ERROR, ValidationSeverity.CRITICAL] 
+                  for issue in self.issues)
+    
+    @property
+    def error_messages(self) -> List[str]:
+        """Get all error messages."""
+        return [issue.message for issue in self.issues 
+                if issue.severity in [ValidationSeverity.ERROR, ValidationSeverity.CRITICAL]]
     warnings_count: int = 0
     errors_count: int = 0
     
