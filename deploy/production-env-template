@@ -1,0 +1,144 @@
+# RLHF Audit Trail - Production Environment Configuration
+# Copy this file to .env and fill in the actual values
+
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+DB_PASSWORD=your_secure_postgres_password_here
+POSTGRES_DB=rlhf_audit
+POSTGRES_USER=audit_user
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+STORAGE_BACKEND=s3
+
+# AWS S3 Configuration
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_REGION=us-east-1
+S3_BUCKET=your-rlhf-audit-trail-bucket
+
+# Google Cloud Storage (alternative)
+# GOOGLE_CLOUD_PROJECT=your-project-id
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+# GCS_BUCKET=your-gcs-bucket
+
+# Azure Blob Storage (alternative)
+# AZURE_STORAGE_ACCOUNT=yourstorageaccount
+# AZURE_STORAGE_KEY=your_storage_key
+# AZURE_CONTAINER=your-container
+
+# =============================================================================
+# COMPLIANCE & SECURITY
+# =============================================================================
+COMPLIANCE_MODE=eu_ai_act
+PRIVACY_EPSILON_BUDGET=10.0
+PRIVACY_DELTA_BUDGET=1e-5
+
+# Encryption Keys (generate with: openssl rand -hex 32)
+ENCRYPTION_KEY=your_32_byte_hex_encryption_key_here
+SIGNING_KEY=your_32_byte_hex_signing_key_here
+
+# =============================================================================
+# APPLICATION CONFIGURATION
+# =============================================================================
+LOG_LEVEL=INFO
+DEBUG=false
+ENVIRONMENT=production
+
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_WORKERS=4
+
+# Cache Configuration
+REDIS_URL=redis://redis:6379/0
+CACHE_TTL=3600
+CACHE_MAX_SIZE=10000
+
+# =============================================================================
+# MONITORING & OBSERVABILITY
+# =============================================================================
+METRICS_ENABLED=true
+TRACING_ENABLED=true
+HEALTH_CHECK_ENABLED=true
+
+# Grafana
+GRAFANA_PASSWORD=your_secure_grafana_password
+
+# Prometheus
+PROMETHEUS_RETENTION=15d
+
+# =============================================================================
+# AUTO-SCALING CONFIGURATION
+# =============================================================================
+MIN_INSTANCES=2
+MAX_INSTANCES=10
+CPU_SCALE_UP_THRESHOLD=80
+CPU_SCALE_DOWN_THRESHOLD=30
+MEMORY_SCALE_UP_THRESHOLD=85
+MEMORY_SCALE_DOWN_THRESHOLD=40
+
+# =============================================================================
+# RATE LIMITING
+# =============================================================================
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+RATE_LIMIT_BURST=100
+
+# =============================================================================
+# BACKUP CONFIGURATION
+# =============================================================================
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+BACKUP_RETENTION_DAYS=30
+BACKUP_COMPRESSION=true
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+ALERT_EMAIL_ENABLED=true
+ALERT_EMAIL_SMTP_HOST=smtp.your-provider.com
+ALERT_EMAIL_SMTP_PORT=587
+ALERT_EMAIL_USERNAME=your_smtp_username
+ALERT_EMAIL_PASSWORD=your_smtp_password
+ALERT_EMAIL_FROM=alerts@your-domain.com
+ALERT_EMAIL_TO=admin@your-domain.com
+
+ALERT_SLACK_ENABLED=false
+ALERT_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/slack/webhook
+
+ALERT_PAGERDUTY_ENABLED=false
+ALERT_PAGERDUTY_SERVICE_KEY=your_pagerduty_service_key
+
+# =============================================================================
+# SSL/TLS CONFIGURATION
+# =============================================================================
+SSL_ENABLED=true
+SSL_CERT_PATH=/etc/nginx/ssl/cert.pem
+SSL_KEY_PATH=/etc/nginx/ssl/key.pem
+SSL_DHPARAM_PATH=/etc/nginx/ssl/dhparam.pem
+
+# =============================================================================
+# PERFORMANCE TUNING
+# =============================================================================
+# Database Connection Pool
+DB_POOL_SIZE=20
+DB_POOL_MAX_OVERFLOW=30
+DB_POOL_TIMEOUT=30
+
+# Application Performance
+WORKER_PROCESSES=auto
+WORKER_CONNECTIONS=1024
+KEEPALIVE_TIMEOUT=65
+MAX_REQUEST_SIZE=100MB
+
+# =============================================================================
+# DEVELOPMENT/TESTING OVERRIDES (DO NOT USE IN PRODUCTION)
+# =============================================================================
+# STORAGE_BACKEND=local
+# DEBUG=true
+# LOG_LEVEL=DEBUG
+# SSL_ENABLED=false
+# RATE_LIMIT_ENABLED=false
