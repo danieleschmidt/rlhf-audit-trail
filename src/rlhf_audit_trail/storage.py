@@ -32,7 +32,7 @@ except ImportError:
     AZURE_AVAILABLE = False
 
 from .crypto import CryptographicEngine
-from .exceptions import AuditTrailError
+from .exceptions import AuditTrailError, StorageError, IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +112,37 @@ class StorageBackend(ABC):
                 return decrypted_data.decode('utf-8')
             except Exception as e:
                 logger.error(f"Failed to decrypt data: {e}")
-                raise AuditTrailError(f"Data decryption failed: {e}")
+                raise StorageError(
+                    f"Data decryption failed: {e}",
+                    operation="decrypt",
+                    storage_backend=self.__class__.__name__
+                )
         else:
             try:
                 return data_bytes.decode('utf-8')
             except UnicodeDecodeError:
                 return data_bytes
+                
+    def verify_integrity(self, key: str, expected_hash: Optional[str] = None) -> bool:
+        """Verify data integrity for stored data."""
+        try:
+            data = self.retrieve(key)
+            if data is None:
+                return False
+                
+            if expected_hash:
+                if isinstance(data, str):
+                    actual_hash = self.crypto.hash_data(data) if self.crypto else None
+                    return actual_hash == expected_hash
+                    
+            return True
+        except Exception as e:
+            logger.error(f"Integrity verification failed for {key}: {e}")
+            raise IntegrityError(
+                f"Integrity verification failed: {e}",
+                data_path=key,
+                verification_method="hash_comparison"
+            )
 
 
 class LocalStorage(StorageBackend):
