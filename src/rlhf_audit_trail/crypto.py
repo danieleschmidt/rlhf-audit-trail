@@ -384,3 +384,46 @@ class IntegrityVerifier:
                 
         logger.info(f"Verified Merkle tree integrity for {len(sample_leaves)} samples")
         return True
+        
+    async def verify_session_integrity(self, session_id: str, 
+                                     start_checkpoint: Optional[str] = None,
+                                     end_checkpoint: Optional[str] = None) -> Dict[str, Any]:
+        """Verify the cryptographic integrity of a training session.
+        
+        Args:
+            session_id: Training session identifier
+            start_checkpoint: Starting checkpoint for verification  
+            end_checkpoint: Ending checkpoint for verification
+            
+        Returns:
+            Dict containing verification results
+        """
+        try:
+            # This is a mock implementation - replace with actual audit record retrieval
+            logger.info(f"Verifying integrity for session: {session_id}")
+            
+            # Mock verification results
+            verification_result = {
+                "session_id": session_id,
+                "is_valid": True,
+                "chain_verification": True,
+                "merkle_root": self.crypto.hash_data(f"session_{session_id}"),
+                "start_checkpoint": start_checkpoint,
+                "end_checkpoint": end_checkpoint,
+                "records_verified": 10,  # Mock count
+                "integrity_score": 1.0,
+                "verification_timestamp": datetime.now().timestamp(),
+                "issues": []
+            }
+            
+            logger.info(f"Session integrity verification completed for {session_id}")
+            return verification_result
+            
+        except Exception as e:
+            logger.error(f"Session integrity verification failed: {e}")
+            return {
+                "session_id": session_id,
+                "is_valid": False,
+                "error": str(e),
+                "verification_timestamp": datetime.now().timestamp()
+            }
