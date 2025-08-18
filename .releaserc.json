@@ -1,0 +1,130 @@
+{
+  "branches": [
+    "main",
+    {
+      "name": "develop",
+      "prerelease": "dev"
+    },
+    {
+      "name": "beta",
+      "prerelease": true
+    }
+  ],
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          { "type": "feat", "release": "minor" },
+          { "type": "fix", "release": "patch" },
+          { "type": "perf", "release": "patch" },
+          { "type": "revert", "release": "patch" },
+          { "type": "docs", "scope": "README", "release": "patch" },
+          { "type": "style", "release": false },
+          { "type": "refactor", "release": "patch" },
+          { "type": "test", "release": false },
+          { "type": "build", "release": "patch" },
+          { "type": "ci", "release": false },
+          { "type": "chore", "release": false },
+          { "breaking": true, "release": "major" },
+          { "scope": "BREAKING", "release": "major" }
+        ],
+        "parserOpts": {
+          "noteKeywords": [
+            "BREAKING CHANGE",
+            "BREAKING CHANGES",
+            "BREAKING"
+          ]
+        }
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "types": [
+            { "type": "feat", "section": "✨ Features" },
+            { "type": "fix", "section": "🐛 Bug Fixes" },
+            { "type": "perf", "section": "⚡ Performance" },
+            { "type": "revert", "section": "⏪ Reverts" },
+            { "type": "docs", "section": "📚 Documentation" },
+            { "type": "style", "section": "💅 Styles", "hidden": true },
+            { "type": "refactor", "section": "♻️ Code Refactoring" },
+            { "type": "test", "section": "✅ Tests", "hidden": true },
+            { "type": "build", "section": "🔧 Build System" },
+            { "type": "ci", "section": "👷 CI/CD", "hidden": true },
+            { "type": "chore", "section": "🏠 Chore", "hidden": true },
+            { "type": "security", "section": "🔒 Security" }
+          ]
+        },
+        "linkCompare": true,
+        "linkReferences": true
+      }
+    ],
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md",
+        "changelogTitle": "# Changelog\n\nAll notable changes to this project will be documented in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n"
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "echo ${nextRelease.version} > VERSION",
+        "publishCmd": "make build-sbom && make docker-build VERSION=${nextRelease.version}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "dist/*.tar.gz",
+            "label": "Python Distribution Package (${nextRelease.gitTag})"
+          },
+          {
+            "path": "dist/*.whl",
+            "label": "Python Wheel (${nextRelease.gitTag})"
+          },
+          {
+            "path": "sbom-*.json",
+            "label": "Software Bill of Materials (SBOM)"
+          },
+          {
+            "path": "SECURITY.md",
+            "label": "Security Policy"
+          },
+          {
+            "path": "compliance-report-*.json",
+            "label": "Compliance Report"
+          }
+        ],
+        "addReleases": "top",
+        "draftRelease": false,
+        "successComment": false,
+        "failTitle": false,
+        "failComment": false
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "CHANGELOG.md",
+          "VERSION",
+          "pyproject.toml",
+          "package.json"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ]
+  ],
+  "repositoryUrl": "https://github.com/danieleschmidt/rlhf-audit-trail.git",
+  "tagFormat": "v${version}",
+  "ci": true,
+  "debug": false,
+  "dryRun": false
+}
