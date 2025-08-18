@@ -1,0 +1,526 @@
+# RLHF Audit Trail - Compliance Audit Workflow
+# This file should be copied to .github/workflows/compliance-audit.yml
+
+name: Compliance Audit
+
+on:
+  schedule:
+    # Run compliance audit every Monday at 6 AM UTC
+    - cron: '0 6 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'compliance/**'
+      - 'docs/compliance/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'compliance/**'
+      - 'docs/compliance/**'
+  workflow_dispatch:
+    inputs:
+      framework:
+        description: 'Compliance framework to audit'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - eu_ai_act
+        - gdpr
+        - nist_ai_rmf
+        - iso_27001
+      generate_report:
+        description: 'Generate detailed compliance report'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: '3.10'
+  COMPLIANCE_OUTPUT_DIR: './compliance-results'
+
+jobs:
+  # EU AI Act Compliance Validation
+  eu-ai-act-audit:
+    name: EU AI Act Compliance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.framework == 'all' || github.event.inputs.framework == 'eu_ai_act' || github.event_name != 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Create compliance output directory
+      run: mkdir -p ${{ env.COMPLIANCE_OUTPUT_DIR }}
+
+    - name: Validate AI System Classification
+      run: |
+        echo "🔍 Validating AI System Classification..."
+        python compliance/eu_ai_act/classify_system.py \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/system_classification.json
+
+    - name: Validate Risk Assessment
+      run: |
+        echo "⚖️ Performing Risk Assessment..."
+        python compliance/eu_ai_act/risk_assessment.py \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/risk_assessment.json
+
+    - name: Validate Data Governance
+      run: |
+        echo "📊 Validating Data Governance..."
+        python compliance/eu_ai_act/data_governance.py \
+          --check-quality --check-bias --check-representativeness \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/data_governance.json
+
+    - name: Validate Technical Documentation
+      run: |
+        echo "📋 Validating Technical Documentation..."
+        python compliance/eu_ai_act/technical_docs.py \
+          --validate-completeness --validate-accuracy \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/technical_docs.json
+
+    - name: Validate Record Keeping
+      run: |
+        echo "📁 Validating Record Keeping Requirements..."
+        python compliance/eu_ai_act/record_keeping.py \
+          --check-retention --check-accessibility --check-integrity \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/record_keeping.json
+
+    - name: Validate Human Oversight
+      run: |
+        echo "👥 Validating Human Oversight..."
+        python compliance/eu_ai_act/human_oversight.py \
+          --check-mechanisms --check-effectiveness \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/human_oversight.json
+
+    - name: Validate Accuracy and Robustness
+      run: |
+        echo "🎯 Validating Accuracy and Robustness..."
+        python compliance/eu_ai_act/accuracy_robustness.py \
+          --run-tests --check-metrics \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/accuracy_robustness.json
+
+    - name: Generate EU AI Act Compliance Report
+      run: |
+        echo "📊 Generating EU AI Act Compliance Report..."
+        python compliance/eu_ai_act/generate_report.py \
+          --input-dir ${{ env.COMPLIANCE_OUTPUT_DIR }} \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/eu_ai_act_compliance_report.json
+
+    - name: Upload EU AI Act Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: eu-ai-act-compliance
+        path: ${{ env.COMPLIANCE_OUTPUT_DIR }}/
+        retention-days: 90
+
+  # GDPR Compliance Validation
+  gdpr-audit:
+    name: GDPR Compliance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.inputs.framework == 'all' || github.event.inputs.framework == 'gdpr' || github.event_name != 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Create compliance output directory
+      run: mkdir -p ${{ env.COMPLIANCE_OUTPUT_DIR }}
+
+    - name: Validate Data Processing Lawfulness
+      run: |
+        echo "⚖️ Validating Data Processing Lawfulness..."
+        python compliance/gdpr/lawfulness_check.py \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/lawfulness.json
+
+    - name: Validate Privacy by Design
+      run: |
+        echo "🔒 Validating Privacy by Design..."
+        python compliance/gdpr/privacy_by_design.py \
+          --check-minimization --check-purpose-limitation \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/privacy_by_design.json
+
+    - name: Validate Data Subject Rights
+      run: |
+        echo "👤 Validating Data Subject Rights Implementation..."
+        python compliance/gdpr/data_subject_rights.py \
+          --check-access --check-rectification --check-erasure --check-portability \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/data_subject_rights.json
+
+    - name: Validate Consent Management
+      run: |
+        echo "✋ Validating Consent Management..."
+        python compliance/gdpr/consent_management.py \
+          --check-validity --check-withdrawal-mechanism \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/consent_management.json
+
+    - name: Validate Data Protection Impact Assessment
+      run: |
+        echo "📋 Validating DPIA Requirements..."
+        python compliance/gdpr/dpia_validation.py \
+          --check-necessity --check-completeness \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/dpia.json
+
+    - name: Validate Security Measures
+      run: |
+        echo "🛡️ Validating Technical and Organizational Measures..."
+        python compliance/gdpr/security_measures.py \
+          --check-encryption --check-pseudonymization --check-access-controls \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/security_measures.json
+
+    - name: Generate GDPR Compliance Report
+      run: |
+        echo "📊 Generating GDPR Compliance Report..."
+        python compliance/gdpr/generate_report.py \
+          --input-dir ${{ env.COMPLIANCE_OUTPUT_DIR }} \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/gdpr_compliance_report.json
+
+    - name: Upload GDPR Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: gdpr-compliance
+        path: ${{ env.COMPLIANCE_OUTPUT_DIR }}/
+        retention-days: 90
+
+  # NIST AI Risk Management Framework Audit
+  nist-ai-rmf-audit:
+    name: NIST AI RMF Compliance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: ${{ github.event.inputs.framework == 'all' || github.event.inputs.framework == 'nist_ai_rmf' || github.event_name != 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Create compliance output directory
+      run: mkdir -p ${{ env.COMPLIANCE_OUTPUT_DIR }}
+
+    - name: Validate GOVERN Function
+      run: |
+        echo "🏛️ Validating GOVERN Function..."
+        python compliance/nist_ai_rmf/govern.py \
+          --check-policies --check-oversight --check-integration \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/govern.json
+
+    - name: Validate MAP Function
+      run: |
+        echo "🗺️ Validating MAP Function..."
+        python compliance/nist_ai_rmf/map.py \
+          --check-context --check-categorization --check-impact \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/map.json
+
+    - name: Validate MEASURE Function
+      run: |
+        echo "📏 Validating MEASURE Function..."
+        python compliance/nist_ai_rmf/measure.py \
+          --check-metrics --check-monitoring --check-analysis \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/measure.json
+
+    - name: Validate MANAGE Function
+      run: |
+        echo "⚙️ Validating MANAGE Function..."
+        python compliance/nist_ai_rmf/manage.py \
+          --check-allocation --check-integration --check-response \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/manage.json
+
+    - name: Generate NIST AI RMF Compliance Report
+      run: |
+        echo "📊 Generating NIST AI RMF Compliance Report..."
+        python compliance/nist_ai_rmf/generate_report.py \
+          --input-dir ${{ env.COMPLIANCE_OUTPUT_DIR }} \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/nist_ai_rmf_compliance_report.json
+
+    - name: Upload NIST AI RMF Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: nist-ai-rmf-compliance
+        path: ${{ env.COMPLIANCE_OUTPUT_DIR }}/
+        retention-days: 90
+
+  # ISO 27001 Security Controls Audit
+  iso-27001-audit:
+    name: ISO 27001 Security Controls Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.inputs.framework == 'all' || github.event.inputs.framework == 'iso_27001' || github.event_name != 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-dev.txt
+        pip install -e .
+
+    - name: Create compliance output directory
+      run: mkdir -p ${{ env.COMPLIANCE_OUTPUT_DIR }}
+
+    - name: Validate Information Security Policies
+      run: |
+        echo "📋 Validating Information Security Policies..."
+        python compliance/iso_27001/policies.py \
+          --check-existence --check-completeness --check-approval \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/policies.json
+
+    - name: Validate Access Control
+      run: |
+        echo "🔐 Validating Access Control..."
+        python compliance/iso_27001/access_control.py \
+          --check-user-management --check-system-access --check-application-access \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/access_control.json
+
+    - name: Validate Cryptographic Controls
+      run: |
+        echo "🔒 Validating Cryptographic Controls..."
+        python compliance/iso_27001/cryptographic_controls.py \
+          --check-key-management --check-encryption --check-digital-signatures \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/cryptographic_controls.json
+
+    - name: Validate System Security
+      run: |
+        echo "🛡️ Validating System Security..."
+        python compliance/iso_27001/system_security.py \
+          --check-security-procedures --check-malware-protection --check-logging \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/system_security.json
+
+    - name: Generate ISO 27001 Compliance Report
+      run: |
+        echo "📊 Generating ISO 27001 Compliance Report..."
+        python compliance/iso_27001/generate_report.py \
+          --input-dir ${{ env.COMPLIANCE_OUTPUT_DIR }} \
+          --output ${{ env.COMPLIANCE_OUTPUT_DIR }}/iso_27001_compliance_report.json
+
+    - name: Upload ISO 27001 Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: iso-27001-compliance
+        path: ${{ env.COMPLIANCE_OUTPUT_DIR }}/
+        retention-days: 90
+
+  # Comprehensive Compliance Report Generation
+  generate-comprehensive-report:
+    name: Generate Comprehensive Compliance Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [eu-ai-act-audit, gdpr-audit, nist-ai-rmf-audit, iso-27001-audit]
+    if: ${{ always() && (github.event.inputs.generate_report == 'true' || github.event_name != 'workflow_dispatch') }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install jinja2 matplotlib seaborn
+
+    - name: Download all compliance results
+      uses: actions/download-artifact@v4
+      with:
+        path: compliance-artifacts/
+
+    - name: Generate comprehensive compliance dashboard
+      run: |
+        echo "📊 Generating Comprehensive Compliance Dashboard..."
+        python compliance/generate_comprehensive_report.py \
+          --input-dir compliance-artifacts/ \
+          --output-dir comprehensive-compliance-report/ \
+          --format json,html,pdf \
+          --include-recommendations \
+          --include-timeline
+
+    - name: Generate compliance metrics
+      run: |
+        echo "📈 Generating Compliance Metrics..."
+        python compliance/generate_metrics.py \
+          --input-dir compliance-artifacts/ \
+          --output comprehensive-compliance-report/metrics.json
+
+    - name: Upload comprehensive compliance report
+      uses: actions/upload-artifact@v4
+      with:
+        name: comprehensive-compliance-report
+        path: comprehensive-compliance-report/
+        retention-days: 365  # Keep for annual audits
+
+    - name: Comment on PR with compliance summary
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const summaryPath = 'comprehensive-compliance-report/summary.json';
+            if (fs.existsSync(summaryPath)) {
+              const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+              
+              let comment = `## 🔍 Compliance Audit Summary\n\n`;
+              comment += `**Overall Compliance Score:** ${summary.overall_score}%\n\n`;
+              
+              if (summary.frameworks) {
+                comment += `### Framework Compliance:\n`;
+                for (const [framework, score] of Object.entries(summary.frameworks)) {
+                  const emoji = score >= 90 ? '✅' : score >= 70 ? '⚠️' : '❌';
+                  comment += `- ${emoji} **${framework}:** ${score}%\n`;
+                }
+              }
+              
+              if (summary.critical_issues && summary.critical_issues.length > 0) {
+                comment += `\n### ⚠️ Critical Issues:\n`;
+                summary.critical_issues.forEach(issue => {
+                  comment += `- ${issue}\n`;
+                });
+              }
+              
+              comment += `\n📊 Full report available in workflow artifacts.`;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+          } catch (error) {
+            console.log('Could not post compliance summary:', error.message);
+          }
+
+  # Create compliance issues for failed checks
+  create-compliance-issues:
+    name: Create Issues for Failed Compliance Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [generate-comprehensive-report]
+    if: ${{ always() && github.event_name == 'schedule' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download comprehensive report
+      uses: actions/download-artifact@v4
+      with:
+        name: comprehensive-compliance-report
+        path: compliance-report/
+
+    - name: Create issues for compliance failures
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const summaryPath = 'compliance-report/summary.json';
+          
+          if (fs.existsSync(summaryPath)) {
+            const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+            
+            if (summary.failed_checks) {
+              for (const failure of summary.failed_checks) {
+                const title = `Compliance Failure: ${failure.framework} - ${failure.check}`;
+                const body = `
+          ## Compliance Check Failure
+          
+          **Framework:** ${failure.framework}
+          **Check:** ${failure.check}
+          **Severity:** ${failure.severity}
+          **Description:** ${failure.description}
+          
+          ### Remediation Steps:
+          ${failure.remediation || 'Please refer to the compliance documentation for remediation steps.'}
+          
+          ### Additional Context:
+          - **Detection Date:** ${new Date().toISOString().split('T')[0]}
+          - **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - **Compliance Score Impact:** ${failure.score_impact || 'Unknown'}
+          
+          This issue was automatically generated by the compliance audit workflow.
+                `;
+                
+                // Check if similar issue already exists
+                const existingIssues = await github.rest.issues.listForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  labels: ['compliance-failure'],
+                  state: 'open'
+                });
+                
+                const duplicateIssue = existingIssues.data.find(issue => 
+                  issue.title.includes(failure.framework) && issue.title.includes(failure.check)
+                );
+                
+                if (!duplicateIssue) {
+                  await github.rest.issues.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: title,
+                    body: body,
+                    labels: ['compliance-failure', 'automated', failure.framework.toLowerCase().replace(/\s+/g, '-')]
+                  });
+                }
+              }
+            }
+          }
