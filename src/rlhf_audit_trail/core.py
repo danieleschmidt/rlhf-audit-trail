@@ -167,10 +167,12 @@ class AuditableRLHF:
         self._setup_compliance()
         self._setup_integrations()
         
-        # Training session state
-        self.current_session: Optional[TrainingSession] = None
-        self.annotation_count = 0
-        self.update_count = 0
+        # Training session state (with thread-local storage for concurrency)
+        import threading
+        self.session_storage = threading.local()
+        self.completed_sessions: Dict[str, TrainingSession] = {}
+        self.global_annotation_count = 0
+        self.global_update_count = 0
         
         self.logger.info(f"Initialized AuditableRLHF for model: {model_name}")
     
@@ -311,8 +313,8 @@ class AuditableRLHF:
                 timestamp=session.end_time,
                 data={
                     "duration": session.duration,
-                    "annotation_count": self.annotation_count,
-                    "update_count": self.update_count,
+                    "annotation_count": self.global_annotation_count,
+                    "update_count": self.global_update_count,
                     "privacy_budget_used": self.privacy_budget.total_spent_epsilon
                 }
             ))
@@ -327,6 +329,8 @@ class AuditableRLHF:
             ))
             
             self.logger.info(f"Completed training session: {session_id}")
+            # Store completed session for future reference
+            self.completed_sessions[session_id] = session
             self.current_session = None
     
     async def log_annotations(
@@ -357,7 +361,7 @@ class AuditableRLHF:
             raise AuditTrailError("No active training session")
         
         batch_id = str(uuid.uuid4())
-        self.annotation_count += 1
+        self.global_annotation_count += 1
         
         # Create annotation batch
         batch = AnnotationBatch(
@@ -449,7 +453,7 @@ class AuditableRLHF:
             raise AuditTrailError("No active training session")
         
         update_id = str(uuid.uuid4())
-        self.update_count += 1
+        self.global_update_count += 1
         self.current_session.phase = TrainingPhase.POLICY_UPDATE
         
         # Extract model statistics (mock implementation - replace with actual)
@@ -460,11 +464,11 @@ class AuditableRLHF:
         # Create policy update record
         update = PolicyUpdate(
             update_id=update_id,
-            checkpoint_name=f"step_{self.update_count}",
+            checkpoint_name=f"step_{self.global_update_count}",
             parameter_delta_norm=parameter_delta_norm,
             gradient_norm=gradient_norm,
             learning_rate=learning_rate,
-            step_number=self.update_count,
+            step_number=self.global_update_count,
             loss=loss,
             timestamp=time.time(),
             metadata=metadata or {}
@@ -517,8 +521,8 @@ class AuditableRLHF:
             "epoch": epoch,
             "metrics": metrics,
             "timestamp": time.time(),
-            "annotation_count": self.annotation_count,
-            "update_count": self.update_count,
+            "annotation_count": self.global_annotation_count,
+            "update_count": self.global_update_count,
             "privacy_budget_used": self.privacy_budget.total_spent_epsilon,
             "metadata": metadata or {}
         }
@@ -580,8 +584,8 @@ class AuditableRLHF:
             "format_version": format,
             "training_summary": {
                 "duration": self.current_session.duration,
-                "annotation_count": self.annotation_count,
-                "policy_updates": self.update_count,
+                "annotation_count": self.global_annotation_count,
+                "policy_updates": self.global_update_count,
                 "start_time": self.current_session.start_time,
                 "end_time": self.current_session.end_time
             }
@@ -628,22 +632,26 @@ class AuditableRLHF:
     async def verify_provenance(
         self,
         start_checkpoint: Optional[str] = None,
-        end_checkpoint: Optional[str] = None
+        end_checkpoint: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Verify the cryptographic integrity of the audit trail.
         
         Args:
             start_checkpoint: Starting checkpoint for verification
             end_checkpoint: Ending checkpoint for verification
+            session_id: Specific session ID to verify (defaults to current session)
             
         Returns:
             Dict containing verification results
         """
-        if not self.current_session:
-            raise AuditTrailError("No active training session")
+        # Use provided session_id or current session
+        target_session_id = session_id or (self.current_session.session_id if self.current_session else None)
+        if not target_session_id:
+            raise AuditTrailError("No active training session and no session_id provided")
         
         verification_result = await self.verifier.verify_session_integrity(
-            self.current_session.session_id,
+            target_session_id,
             start_checkpoint,
             end_checkpoint
         )

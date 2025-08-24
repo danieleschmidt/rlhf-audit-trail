@@ -1,0 +1,1 @@
+{"annotator_ids":["anon_001","anon_002"],"metadata":{},"prompts":["What is the capital of France?","Explain quantum computing"],"responses":["Paris is the capital.","Quantum computing uses qubits..."],"rewards":[0.9,0.85],"timestamp":1756040216.4986024}
