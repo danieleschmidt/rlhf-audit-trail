@@ -1,0 +1,1 @@
+{"annotator_ids":["perf_user_0","perf_user_1","perf_user_2","perf_user_3"],"metadata":{},"prompts":["Perf 1_0","Perf 1_1","Perf 1_2","Perf 1_3"],"responses":["Resp 1_0","Resp 1_1","Resp 1_2","Resp 1_3"],"rewards":[0.85,0.85,0.85,0.85],"timestamp":1756040619.187881}
