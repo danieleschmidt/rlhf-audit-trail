@@ -1,0 +1,146 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed_tests": 9,
+    "failed_tests": 1,
+    "success_rate": 90.0,
+    "overall_status": "FAIL",
+    "execution_time": 6.458535671234131
+  },
+  "test_results": [
+    {
+      "test_name": "Autonomous Research Orchestrator Import",
+      "passed": false,
+      "timestamp": 1756125454.4925857,
+      "execution_time": 0.04973649978637695,
+      "metrics": {
+        "import_error": "No module named 'pydantic'",
+        "standalone_error": "name 'ResearchDomain' is not defined"
+      },
+      "details": "Failed to import: No module named 'pydantic'"
+    },
+    {
+      "test_name": "Research Opportunity Discovery",
+      "passed": true,
+      "timestamp": 1756125455.4069455,
+      "execution_time": 0.9640960693359375,
+      "metrics": {
+        "opportunities_discovered": 9,
+        "domains_explored": 3,
+        "discovery_success_rate": 100.0
+      },
+      "details": "Successfully discovered 9 research opportunities"
+    },
+    {
+      "test_name": "Autonomous Experiment Execution",
+      "passed": true,
+      "timestamp": 1756125456.3213828,
+      "execution_time": 1.8785336017608643,
+      "metrics": {
+        "experiments_executed": 3,
+        "success_rate_percent": 100.0,
+        "insights_generated": 3
+      },
+      "details": "Executed 3 experiments with 100.0% success rate"
+    },
+    {
+      "test_name": "Research Insight Generation",
+      "passed": true,
+      "timestamp": 1756125457.2363863,
+      "execution_time": 2.793537139892578,
+      "metrics": {
+        "total_insights": 3,
+        "insights_per_experiment": 1.0,
+        "statistical_rigor": "validated"
+      },
+      "details": "Generated 3 insights with 1.0 insights per experiment"
+    },
+    {
+      "test_name": "Knowledge Graph Construction",
+      "passed": true,
+      "timestamp": 1756125458.1551926,
+      "execution_time": 3.712343215942383,
+      "metrics": {
+        "graph_nodes": 6,
+        "graph_edges": 3,
+        "insight_density": 0.5,
+        "domains_connected": 3
+      },
+      "details": "Built knowledge graph with 6 nodes and 3 edges"
+    },
+    {
+      "test_name": "Publication Readiness",
+      "passed": true,
+      "timestamp": 1756125459.0698,
+      "execution_time": 4.62695050239563,
+      "metrics": {
+        "publications_ready": 3,
+        "publication_rate_percent": 100.0,
+        "academic_standards": "met"
+      },
+      "details": "3 publications ready (100.0% rate)"
+    },
+    {
+      "test_name": "Research Methodology Validation",
+      "passed": true,
+      "timestamp": 1756125459.985019,
+      "execution_time": 5.542169570922852,
+      "metrics": {
+        "statistical_rigor_score": 0.95,
+        "practical_relevance_score": 0.276,
+        "replication_potential": 0.85,
+        "methodology_compliance": "rigorous"
+      },
+      "details": "Statistical rigor: 0.950, Practical relevance: 0.276"
+    },
+    {
+      "test_name": "Performance Benchmarks",
+      "passed": true,
+      "timestamp": 1756125460.90025,
+      "execution_time": 6.457400321960449,
+      "metrics": {
+        "total_execution_time_seconds": 0.92,
+        "time_per_opportunity_seconds": 0.1,
+        "time_per_experiment_seconds": 0.31,
+        "throughput_opportunities_per_second": 9.834,
+        "memory_efficiency": "optimal"
+      },
+      "details": "System executed in 0.92s with 0.10s per opportunity"
+    },
+    {
+      "test_name": "Security Validation",
+      "passed": true,
+      "timestamp": 1756125460.9012527,
+      "execution_time": 6.458403587341309,
+      "metrics": {
+        "security_checks_passed": 5,
+        "total_security_checks": 5,
+        "security_score": 1.0,
+        "vulnerability_scan": "clean"
+      },
+      "details": "Passed 5/5 security checks"
+    },
+    {
+      "test_name": "Integration Compatibility",
+      "passed": true,
+      "timestamp": 1756125460.9013627,
+      "execution_time": 6.458513259887695,
+      "metrics": {
+        "integration_checks_passed": 4,
+        "total_integration_checks": 4,
+        "integration_score": 1.0,
+        "compatibility_status": "maintained"
+      },
+      "details": "Passed 4/4 integration checks"
+    }
+  ],
+  "quality_metrics": {
+    "functionality_score": 0.75,
+    "performance_score": 1.0,
+    "security_score": 1.0,
+    "integration_score": 1.0
+  },
+  "recommendations": [
+    "Address failing test cases to improve system reliability"
+  ]
+}
