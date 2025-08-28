@@ -3,8 +3,8 @@
     "total_gates": 6,
     "passed_gates": 6,
     "success_rate": 1.0,
-    "execution_time": 0.11320376396179199,
-    "timestamp": 1755929104.7876194
+    "execution_time": 0.11507010459899902,
+    "timestamp": 1756345489.921802
   },
   "results": [
     {
@@ -16,7 +16,7 @@
         "dict_operations": "passed",
         "string_operations": "passed"
       },
-      "execution_time": 8.821487426757812e-06
+      "execution_time": 9.059906005859375e-06
     },
     {
       "name": "Async Operations",
@@ -25,9 +25,9 @@
       "details": {
         "async_sleep": "passed",
         "async_gather": "passed",
-        "duration": 0.10052084922790527
+        "duration": 0.10048413276672363
       },
-      "execution_time": 0.1110842227935791
+      "execution_time": 0.11111283302307129
     },
     {
       "name": "File Operations",
@@ -38,19 +38,19 @@
         "file_read": "passed",
         "json_operations": "passed"
       },
-      "execution_time": 0.0005364418029785156
+      "execution_time": 0.0006823539733886719
     },
     {
       "name": "Performance",
       "passed": true,
       "score": 1.0,
       "details": {
-        "list_creation_time": 0.0004165172576904297,
-        "comprehension_time": 0.000675201416015625,
-        "sum_time": 9.250640869140625e-05,
+        "list_creation_time": 0.0012447834014892578,
+        "comprehension_time": 0.0014774799346923828,
+        "sum_time": 0.00011372566223144531,
         "total_computed": 333283335000
       },
-      "execution_time": 0.0014190673828125
+      "execution_time": 0.0030896663665771484
     },
     {
       "name": "Error Handling",
@@ -60,7 +60,7 @@
         "standard_exception": "caught",
         "custom_exception": "caught"
       },
-      "execution_time": 5.364418029785156e-05
+      "execution_time": 5.6743621826171875e-05
     },
     {
       "name": "Data Structures",
@@ -71,7 +71,7 @@
         "dict_comprehensions": "passed",
         "nested_structures": "passed"
       },
-      "execution_time": 1.5497207641601562e-05
+      "execution_time": 1.7642974853515625e-05
     }
   ]
 }

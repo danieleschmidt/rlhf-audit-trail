@@ -1,0 +1,13 @@
+{
+  "timestamp": 1756345563.1107466,
+  "checks": {
+    "sensitive_files": "PASS",
+    "hardcoded_secrets": "WARN",
+    "sql_injection": "PASS",
+    "file_permissions": "PASS",
+    "insecure_imports": "WARN"
+  },
+  "overall_status": "FAIL",
+  "vulnerabilities_found": 10,
+  "security_score": 65.0
+}

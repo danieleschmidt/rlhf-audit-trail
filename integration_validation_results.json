@@ -1,0 +1,41 @@
+{
+  "timestamp": 1756345638.8530145,
+  "validations": {
+    "file_structure": {
+      "files_found": 6,
+      "files_required": 6,
+      "score": 100.0,
+      "status": "PASS"
+    },
+    "configuration": {
+      "configs_found": 3,
+      "configs_checked": 3,
+      "score": 100.0,
+      "status": "PASS"
+    },
+    "syntax_validation": {
+      "files_valid": 60,
+      "files_checked": 62,
+      "score": 96.7741935483871,
+      "status": "PASS"
+    },
+    "documentation": {
+      "docs_found": 45,
+      "critical_docs": 2,
+      "score": 100,
+      "status": "PASS"
+    },
+    "test_integration": {
+      "test_files": 15,
+      "score": 100,
+      "status": "PASS"
+    },
+    "dependency_management": {
+      "config_files": 2,
+      "score": 100.0,
+      "status": "PASS"
+    }
+  },
+  "overall_status": "PASS",
+  "integration_score": 99.46236559139784
+}
