@@ -165,6 +165,12 @@ class RetryHandler:
             config: Retry configuration
         """
         self.config = config or RetryConfig()
+        self.retry_stats = {
+            'total_attempts': 0,
+            'successful_retries': 0,
+            'failed_permanently': 0,
+            'average_attempts': 0.0
+        }
     
     def __call__(self, func: Callable) -> Callable:
         """Decorator to add retry logic to function."""
@@ -176,13 +182,21 @@ class RetryHandler:
     async def execute_with_retry(self, func: Callable, *args, **kwargs) -> Any:
         """Execute function with retry logic."""
         last_exception = None
+        self.retry_stats['total_attempts'] += 1
         
         for attempt in range(self.config.max_attempts):
             try:
                 if asyncio.iscoroutinefunction(func):
-                    return await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)
                 else:
-                    return func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+                
+                # Update success stats
+                if attempt > 0:
+                    self.retry_stats['successful_retries'] += 1
+                self._update_average_attempts(attempt + 1)
+                
+                return result
                     
             except Exception as e:
                 last_exception = e
@@ -190,6 +204,7 @@ class RetryHandler:
                 # Check if exception is retryable
                 if not any(isinstance(e, exc_type) for exc_type in self.config.retryable_exceptions):
                     logger.warning(f"Non-retryable exception: {e}")
+                    self.retry_stats['failed_permanently'] += 1
                     raise
                 
                 # Don't retry on last attempt
@@ -203,6 +218,8 @@ class RetryHandler:
                 await asyncio.sleep(delay)
         
         # All attempts failed
+        self.retry_stats['failed_permanently'] += 1
+        self._update_average_attempts(self.config.max_attempts)
         logger.error(f"All {self.config.max_attempts} attempts failed. Last error: {last_exception}")
         raise last_exception
     
@@ -218,6 +235,16 @@ class RetryHandler:
             delay = delay * jitter
             
         return delay
+    
+    def _update_average_attempts(self, attempts: int):
+        """Update average attempts statistic."""
+        total = self.retry_stats['total_attempts']
+        current_avg = self.retry_stats['average_attempts']
+        self.retry_stats['average_attempts'] = ((current_avg * (total - 1)) + attempts) / total
+    
+    def get_retry_statistics(self) -> Dict[str, Any]:
+        """Get retry handler statistics."""
+        return dict(self.retry_stats)
 
 
 class HealthMonitor:

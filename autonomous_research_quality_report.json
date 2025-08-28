@@ -5,14 +5,14 @@
     "failed_tests": 1,
     "success_rate": 90.0,
     "overall_status": "FAIL",
-    "execution_time": 6.458535671234131
+    "execution_time": 6.481205224990845
   },
   "test_results": [
     {
       "test_name": "Autonomous Research Orchestrator Import",
       "passed": false,
-      "timestamp": 1756125454.4925857,
-      "execution_time": 0.04973649978637695,
+      "timestamp": 1756345513.0016844,
+      "execution_time": 0.05804848670959473,
       "metrics": {
         "import_error": "No module named 'pydantic'",
         "standalone_error": "name 'ResearchDomain' is not defined"
@@ -22,8 +22,8 @@
     {
       "test_name": "Research Opportunity Discovery",
       "passed": true,
-      "timestamp": 1756125455.4069455,
-      "execution_time": 0.9640960693359375,
+      "timestamp": 1756345513.9178295,
+      "execution_time": 0.9741935729980469,
       "metrics": {
         "opportunities_discovered": 9,
         "domains_explored": 3,
@@ -34,8 +34,8 @@
     {
       "test_name": "Autonomous Experiment Execution",
       "passed": true,
-      "timestamp": 1756125456.3213828,
-      "execution_time": 1.8785336017608643,
+      "timestamp": 1756345514.837867,
+      "execution_time": 1.894230842590332,
       "metrics": {
         "experiments_executed": 3,
         "success_rate_percent": 100.0,
@@ -46,8 +46,8 @@
     {
       "test_name": "Research Insight Generation",
       "passed": true,
-      "timestamp": 1756125457.2363863,
-      "execution_time": 2.793537139892578,
+      "timestamp": 1756345515.752648,
+      "execution_time": 2.809011936187744,
       "metrics": {
         "total_insights": 3,
         "insights_per_experiment": 1.0,
@@ -58,8 +58,8 @@
     {
       "test_name": "Knowledge Graph Construction",
       "passed": true,
-      "timestamp": 1756125458.1551926,
-      "execution_time": 3.712343215942383,
+      "timestamp": 1756345516.6705146,
+      "execution_time": 3.7268788814544678,
       "metrics": {
         "graph_nodes": 6,
         "graph_edges": 3,
@@ -71,8 +71,8 @@
     {
       "test_name": "Publication Readiness",
       "passed": true,
-      "timestamp": 1756125459.0698,
-      "execution_time": 4.62695050239563,
+      "timestamp": 1756345517.5859728,
+      "execution_time": 4.642336845397949,
       "metrics": {
         "publications_ready": 3,
         "publication_rate_percent": 100.0,
@@ -83,26 +83,26 @@
     {
       "test_name": "Research Methodology Validation",
       "passed": true,
-      "timestamp": 1756125459.985019,
-      "execution_time": 5.542169570922852,
+      "timestamp": 1756345518.5050554,
+      "execution_time": 5.561419248580933,
       "metrics": {
         "statistical_rigor_score": 0.95,
-        "practical_relevance_score": 0.276,
+        "practical_relevance_score": 0.26,
         "replication_potential": 0.85,
         "methodology_compliance": "rigorous"
       },
-      "details": "Statistical rigor: 0.950, Practical relevance: 0.276"
+      "details": "Statistical rigor: 0.950, Practical relevance: 0.260"
     },
     {
       "test_name": "Performance Benchmarks",
       "passed": true,
-      "timestamp": 1756125460.90025,
-      "execution_time": 6.457400321960449,
+      "timestamp": 1756345519.4238691,
+      "execution_time": 6.4802327156066895,
       "metrics": {
         "total_execution_time_seconds": 0.92,
         "time_per_opportunity_seconds": 0.1,
         "time_per_experiment_seconds": 0.31,
-        "throughput_opportunities_per_second": 9.834,
+        "throughput_opportunities_per_second": 9.796,
         "memory_efficiency": "optimal"
       },
       "details": "System executed in 0.92s with 0.10s per opportunity"
@@ -110,8 +110,8 @@
     {
       "test_name": "Security Validation",
       "passed": true,
-      "timestamp": 1756125460.9012527,
-      "execution_time": 6.458403587341309,
+      "timestamp": 1756345519.4247031,
+      "execution_time": 6.481066703796387,
       "metrics": {
         "security_checks_passed": 5,
         "total_security_checks": 5,
@@ -123,8 +123,8 @@
     {
       "test_name": "Integration Compatibility",
       "passed": true,
-      "timestamp": 1756125460.9013627,
-      "execution_time": 6.458513259887695,
+      "timestamp": 1756345519.4248161,
+      "execution_time": 6.481179714202881,
       "metrics": {
         "integration_checks_passed": 4,
         "total_integration_checks": 4,
